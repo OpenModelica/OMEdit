@@ -67,6 +67,7 @@ private:
   CustomExpressionBox *mpExpressionTextBox;
   QPushButton *mpOMCLoggerSendButton;
   QPlainTextEdit *mpOMCLoggerTextBox;
+  QTextCursor mOMCLoggerTextCursor;
   Label *mpOMCLoggerEnableHintLabel;
   QWidget *mpOMCDiffWidget;
   Label *mpOMCDiffBeforeLabel;
