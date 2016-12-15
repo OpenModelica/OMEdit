@@ -261,7 +261,6 @@ public:
   void moveClassUpDown(LibraryTreeItem *pLibraryTreeItem, bool up);
   void moveClassTopBottom(LibraryTreeItem *pLibraryTreeItem, bool top);
   void updateBindings(LibraryTreeItem *pLibraryTreeItem);
-  void generateVerificationScenarios(LibraryTreeItem *pLibraryTreeItem);
   QString getUniqueTopLevelItemName(QString name, int number = 1);
   void emitDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight) {emit dataChanged(topLeft, bottomRight);}
 private:
@@ -332,7 +331,6 @@ private:
   QAction *mpExportXMLAction;
   QAction *mpExportFigaroAction;
   QAction *mpUpdateBindingsAction;
-  QAction *mpGenerateVerificationScenariosAction;
   QAction *mpFetchInterfaceDataAction;
   QAction *mpTLMCoSimulationAction;
   void createActions();
@@ -370,7 +368,6 @@ public slots:
   void exportModelXML();
   void exportModelFigaro();
   void updateBindings();
-  void generateVerificationScenarios();
   void fetchInterfaceData();
   void TLMSimulate();
 protected:

@@ -2037,21 +2037,6 @@ void LibraryTreeModel::updateBindings(LibraryTreeItem *pLibraryTreeItem)
 }
 
 /*!
- * \brief LibraryTreeModel::generateVerificationScenarios
- * \param pLibraryTreeItem
- */
-void LibraryTreeModel::generateVerificationScenarios(LibraryTreeItem *pLibraryTreeItem)
-{
-  if (MainWindow::instance()->getOMCProxy()->generateVerificationScenarios(pLibraryTreeItem->getNameStructure())) {
-    if (pLibraryTreeItem->getModelWidget()) {
-      pLibraryTreeItem->getModelWidget()->updateModelText();
-    } else {
-      updateLibraryTreeItemClassText(pLibraryTreeItem);
-    }
-  }
-}
-
-/*!
  * \brief LibraryTreeModel::getUniqueTopLevelItemName
  * Finds the unique name for a new top level LibraryTreeItem based on the suggested name.
  * \param name
@@ -2649,10 +2634,6 @@ void LibraryTreeView::createActions()
   mpUpdateBindingsAction = new QAction(tr("Update Bindings"), this);
   mpUpdateBindingsAction->setStatusTip(tr("updates the bindings"));
   connect(mpUpdateBindingsAction, SIGNAL(triggered()), SLOT(updateBindings()));
-  // Generate Verification Scenarios Action
-  mpGenerateVerificationScenariosAction = new QAction(tr("Generate Verification Scenarios"), this);
-  mpGenerateVerificationScenariosAction->setStatusTip(tr("Generates the verification scenarios"));
-  connect(mpGenerateVerificationScenariosAction, SIGNAL(triggered()), SLOT(generateVerificationScenarios()));
   // fetch interface data
   mpFetchInterfaceDataAction = new QAction(QIcon(":/Resources/icons/interface-data.svg"), Helper::fetchInterfaceData, this);
   mpFetchInterfaceDataAction->setStatusTip(Helper::fetchInterfaceDataTip);
@@ -2797,10 +2778,6 @@ void LibraryTreeView::showContextMenu(QPoint point)
         if (pLibraryTreeItem->isSimulationAllowed()) {
           menu.addSeparator();
           menu.addAction(mpUpdateBindingsAction);
-        }
-        if (pLibraryTreeItem->getRestriction() == StringHandler::Package) {
-          menu.addSeparator();
-          menu.addAction(mpGenerateVerificationScenariosAction);
         }
         break;
       case LibraryTreeItem::Text:
@@ -3186,18 +3163,6 @@ void LibraryTreeView::updateBindings()
   LibraryTreeItem *pLibraryTreeItem = getSelectedLibraryTreeItem();
   if (pLibraryTreeItem) {
     mpLibraryWidget->getLibraryTreeModel()->updateBindings(pLibraryTreeItem);
-  }
-}
-
-/*!
- * \brief LibraryTreeView::generateVerificationScenarios
- * Generate verification scenarios
- */
-void LibraryTreeView::generateVerificationScenarios()
-{
-  LibraryTreeItem *pLibraryTreeItem = getSelectedLibraryTreeItem();
-  if (pLibraryTreeItem) {
-    mpLibraryWidget->getLibraryTreeModel()->generateVerificationScenarios(pLibraryTreeItem);
   }
 }
 
