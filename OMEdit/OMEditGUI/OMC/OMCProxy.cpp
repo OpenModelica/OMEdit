@@ -233,6 +233,9 @@ bool OMCProxy::initializeOMC()
   changeDirectory(tmpPath);
   // set the OpenModelicaLibrary variable.
   Helper::OpenModelicaLibrary = getModelicaPath();
+  /* Disable code generation by default in OMEdit only (for 1.11.
+   * Will be changed in OMC default for 1.12 */
+  setCommandLineOptions("-d=nogen");
   return true;
 }
 
