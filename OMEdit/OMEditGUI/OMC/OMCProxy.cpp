@@ -955,6 +955,10 @@ QString OMCProxy::getComponentModifierValue(QString className, QString name)
   */
 bool OMCProxy::setComponentModifierValue(QString className, QString modifierName, QString modifierValue)
 {
+  modifierValue = StringHandler::removeFirstLastQuotes(modifierValue);
+  if (StringHandler::containsSpace(modifierValue)) {
+    modifierValue = QString("\"%1\"").arg(modifierValue);
+  }
   QString expression;
   if (modifierValue.isEmpty()) {
     expression = QString("setComponentModifierValue(%1, %2, $Code(()))").arg(className).arg(modifierName);
@@ -964,7 +968,7 @@ bool OMCProxy::setComponentModifierValue(QString className, QString modifierName
     expression = QString("setComponentModifierValue(%1, %2, $Code(=%3))").arg(className).arg(modifierName).arg(modifierValue);
   }
   sendCommand(expression);
-  if (getResult().toLower().contains("ok")) {
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
   } else {
     QString msg = tr("Unable to set the component modifier value using command <b>%1</b>").arg(expression);
@@ -1019,6 +1023,10 @@ QString OMCProxy::getExtendsModifierValue(QString className, QString extendsClas
 
 bool OMCProxy::setExtendsModifierValue(QString className, QString extendsClassName, QString modifierName, QString modifierValue)
 {
+  modifierValue = StringHandler::removeFirstLastQuotes(modifierValue);
+  if (StringHandler::containsSpace(modifierValue)) {
+    modifierValue = QString("\"%1\"").arg(modifierValue);
+  }
   QString expression;
   if (modifierValue.isEmpty()) {
     expression = QString("setExtendsModifierValue(%1, %2, %3, $Code(()))").arg(className).arg(extendsClassName).arg(modifierName);
@@ -1030,7 +1038,7 @@ bool OMCProxy::setExtendsModifierValue(QString className, QString extendsClassNa
         .arg(modifierValue);
   }
   sendCommand(expression);
-  if (getResult().toLower().contains("ok")) {
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
   } else {
     QString msg = tr("Unable to set the extends modifier value using command <b>%1</b>").arg(expression);
@@ -1801,10 +1809,11 @@ bool OMCProxy::renameComponentInClass(QString className, QString oldName, QStrin
 bool OMCProxy::updateConnection(QString from, QString to, QString className, QString annotation)
 {
   sendCommand("updateConnection(" + from + "," + to + "," + className + "," + annotation + ")");
-  if (getResult().contains("Ok"))
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
-  else
+  } else {
     return false;
+  }
 }
 
 /*!
@@ -1860,7 +1869,7 @@ bool OMCProxy::setComponentComment(QString className, QString componentName, QSt
 bool OMCProxy::setComponentDimensions(QString className, QString componentName, QString dimensions)
 {
   sendCommand("setComponentDimensions(" + className + "," + componentName + "," + dimensions + ")");
-  if (getResult().contains("Ok")) {
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
   } else {
     return false;
@@ -1882,7 +1891,7 @@ bool OMCProxy::addConnection(QString from, QString to, QString className, QStrin
   } else {
     sendCommand("addConnection(" + from + "," + to + "," + className + "," + annotation + ")");
   }
-  if (getResult().contains("Ok")) {
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
   } else {
     return false;
@@ -1899,10 +1908,9 @@ bool OMCProxy::addConnection(QString from, QString to, QString className, QStrin
 bool OMCProxy::deleteConnection(QString from, QString to, QString className)
 {
   sendCommand("deleteConnection(" + from + "," + to + "," + className + ")");
-  if (getResult().contains("Ok"))
+  if (getResult().toLower().compare("ok") == 0) {
     return true;
-  else
-  {
+  } else {
     printMessagesStringInternal();
     return false;
   }
