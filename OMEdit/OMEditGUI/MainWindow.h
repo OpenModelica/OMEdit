@@ -263,6 +263,7 @@ private:
   QAction *mpCascadeWindowsAction;
   QAction *mpTileWindowsHorizontallyAction;
   QAction *mpTileWindowsVerticallyAction;
+  QAction *mpToggleTabOrSubWindowView;
   // Simulation Menu
   QAction *mpInstantiateModelAction;
   QAction *mpCheckModelAction;
@@ -378,6 +379,7 @@ public slots:
   void cascadeSubWindows();
   void tileSubWindowsHorizontally();
   void tileSubWindowsVertically();
+  void toggleTabOrSubWindowView();
   void instantiateModel();
   void checkModel();
   void checkAllModels();
