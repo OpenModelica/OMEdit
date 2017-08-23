@@ -39,6 +39,8 @@
 #include "Util/Helper.h"
 #include "Util/Utilities.h"
 #include "Util/StringHandler.h"
+#include "Options/OptionsDialog.h"
+#include "Git/CommitChangesDialog.h"
 
 #include <QMessageBox>
 
@@ -79,7 +81,7 @@ ImportFMUDialog::ImportFMUDialog(QWidget *pParent)
   mpLogLevelComboBox->addItem(tr("Fatal"), QVariant(1));
   mpLogLevelComboBox->addItem(tr("Error"), QVariant(2));
   mpLogLevelComboBox->addItem(tr("Warning"), QVariant(3));
-  mpLogLevelComboBox->addItem(tr("Information"), QVariant(4));
+  mpLogLevelComboBox->addItem(Helper::information, QVariant(4));
   mpLogLevelComboBox->addItem(tr("Verbose"), QVariant(5));
   mpLogLevelComboBox->addItem(tr("Debug"), QVariant(6));
   mpLogLevelComboBox->setCurrentIndex(3);
@@ -157,6 +159,14 @@ void ImportFMUDialog::importFMU()
                                                                          mpGenerateOutputConnectors->isChecked());
   if (!fmuFileName.isEmpty()) {
     MainWindow::instance()->getLibraryWidget()->openFile(fmuFileName);
+  }
+  // trace import modeldescription
+  if (OptionsDialog::instance()->getTraceabilityPage()->getTraceabilityGroupBox()->isChecked() && !fmuFileName.isEmpty()) {
+    QFileInfo file(fmuFileName);
+    // Get the name of the file without the extension
+    QString base_name = file.baseName();
+    // Push traceability information automaticaly to Daemon
+    MainWindow::instance()->getCommitChangesDialog()->generateTraceabilityURI("fmuImport", fmuFileName, base_name, mpFmuFileTextBox->text());
   }
   accept();
 }

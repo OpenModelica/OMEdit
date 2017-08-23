@@ -170,6 +170,7 @@ class VisualizerAbstract
   VisType getVisType() const;
   OMVisScene* getOMVisScene() const;
   std::string getModelFile() const;
+
   //virtual void setSimulationSettings(const UserSimSettingsFMU& simSetFMU) { };
   //virtual void simulate(TimeManager& omvm) = 0;
   virtual void startVisualization();

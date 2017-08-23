@@ -69,6 +69,7 @@ void Viewer::setUpThreading()
  */
 ViewerWidget::ViewerWidget(QWidget* parent, Qt::WindowFlags flags)
   : GLWidget(parent, flags)
+
 {
   // Set the number of samples used for multisampling
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 4, 0))
@@ -275,6 +276,7 @@ void ViewerWidget::showShapePickContextMenu(const QPoint& pos)
     shapeMenu.addAction( &action4);
     shapeMenu.addAction( &action5);
     shapeMenu.addAction( &action6);
+    shapeMenu.addSeparator();
     connect(&action1, SIGNAL(triggered()), this, SLOT(changeShapeTransparency()));
     connect(&action2, SIGNAL(triggered()), this, SLOT(makeShapeInvisible()));
     connect(&action3, SIGNAL(triggered()), this, SLOT(changeShapeColor()));
@@ -334,6 +336,7 @@ void ViewerWidget::removeTexture()
       }
     }
 }
+
 
 /*!
  * \brief ViewerWidget::applyCustomTexture

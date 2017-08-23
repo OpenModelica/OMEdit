@@ -38,6 +38,7 @@
 #include <QTreeView>
 #include <QSortFilterProxyModel>
 #include <QTreeWidget>
+#include <QComboBox>
 #include <QSplitter>
 
 #include "OMDumpXML.h"
@@ -169,7 +170,6 @@ public:
   QSplitter* getEquationsNestedVerticalSplitter() {return mpEquationsNestedVerticalSplitter;}
   QSplitter* getEquationsHorizontalSplitter() {return mpEquationsHorizontalSplitter;}
   QSplitter* getTransformationsVerticalSplitter() {return mpTransformationsVerticalSplitter;}
-  QSplitter* getTransformationsHorizontalSplitter() {return mpTransformationsHorizontalSplitter;}
   void loadTransformations();
   void fetchDefinedInEquations(const OMVariable &variable);
   void fetchUsedInEquations(const OMVariable &variable);
@@ -180,11 +180,12 @@ public:
   void fetchEquationData(int equationIndex);
   void fetchDefines(OMEquation *equation);
   void fetchDepends(OMEquation *equation);
-  void fetchOperations(OMEquation *equation);
+  void fetchOperations(OMEquation *equation, HtmlDiff htmlDiff);
   void clearTreeWidgetItems(QTreeWidget *pTreeWidget);
 private:
   QString mInfoJSONFullFileName, mProfJSONFullFileName, mProfilingDataRealFileName;
   int profilingNumSteps;
+  int mCurrentEquationIndex;
   MyHandler *mpInfoXMLFileHandler;
   TreeSearchFilters *mpTreeSearchFilters;
   TVariablesTreeView *mpTVariablesTreeView;
@@ -196,6 +197,7 @@ private:
   EquationTreeWidget *mpEquationsTreeWidget;
   QTreeWidget *mpDefinesVariableTreeWidget;
   QTreeWidget *mpDependsVariableTreeWidget;
+  QComboBox *mpEquationDiffFilterComboBox;
   QTreeWidget *mpEquationOperationsTreeWidget;
   Label *mpTSourceEditorFileLabel;
   InfoBar *mpTSourceEditorInfoBar;
@@ -207,7 +209,6 @@ private:
   QSplitter *mpEquationsNestedVerticalSplitter;
   QSplitter *mpEquationsHorizontalSplitter;
   QSplitter *mpTransformationsVerticalSplitter;
-  QSplitter *mpTransformationsHorizontalSplitter;
   QHash<QString,OMVariable> mVariables;
   QList<OMEquation*> mEquations;
   bool hasOperationsEnabled;
@@ -219,6 +220,7 @@ public slots:
   void findVariables();
   void fetchVariableData(const QModelIndex &index);
   void fetchEquationData(QTreeWidgetItem *pEquationTreeItem, int column);
+  void filterEquationOperations(int index);
 };
 
 #endif // TRANSFORMATIONSWIDGET_H

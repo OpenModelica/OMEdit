@@ -442,6 +442,10 @@ void ShapeAnnotation::createActions()
   mpShapeAttributesAction = new QAction(Helper::attributes, mpGraphicsView);
   mpShapeAttributesAction->setStatusTip(tr("Shows the shape attributes"));
   connect(mpShapeAttributesAction, SIGNAL(triggered()), SLOT(showShapeAttributes()));
+  // edit transition action
+  mpEditTransitionAction = new QAction(Helper::editTransition, mpGraphicsView);
+  mpEditTransitionAction->setStatusTip(tr("Edits the transition"));
+  connect(mpEditTransitionAction, SIGNAL(triggered()), SLOT(editTransition()));
 }
 
 /*!
@@ -524,24 +528,23 @@ void ShapeAnnotation::applyFillPattern(QPainter *painter)
   QRadialGradient radialGradient;
   switch (mFillPattern) {
     case StringHandler::FillHorizontalCylinder:
-      linearGradient = QLinearGradient(boundingRectangle.center().x(), boundingRectangle.center().y(), boundingRectangle.center().x(), boundingRectangle.y());
-      linearGradient.setColorAt(0.0, mFillColor);
+      linearGradient = QLinearGradient(boundingRectangle.center().x(), boundingRectangle.top(), boundingRectangle.center().x(), boundingRectangle.bottom());
+      linearGradient.setColorAt(0.0, mLineColor);
+      linearGradient.setColorAt(0.5, mFillColor);
       linearGradient.setColorAt(1.0, mLineColor);
-      linearGradient.setSpread(QGradient::ReflectSpread);
       painter->setBrush(linearGradient);
       break;
     case StringHandler::FillVerticalCylinder:
-      linearGradient = QLinearGradient(boundingRectangle.center().x(), boundingRectangle.center().y(), boundingRectangle.x(), boundingRectangle.center().y());
-      linearGradient.setColorAt(0.0, mFillColor);
+      linearGradient = QLinearGradient(boundingRectangle.left(), boundingRectangle.center().y(), boundingRectangle.right(), boundingRectangle.center().y());
+      linearGradient.setColorAt(0.0, mLineColor);
+      linearGradient.setColorAt(0.5, mFillColor);
       linearGradient.setColorAt(1.0, mLineColor);
-      linearGradient.setSpread(QGradient::ReflectSpread);
       painter->setBrush(linearGradient);
       break;
     case StringHandler::FillSphere:
       radialGradient = QRadialGradient(boundingRectangle.center().x(), boundingRectangle.center().y(), boundingRectangle.width());
       radialGradient.setColorAt(0.0, mFillColor);
       radialGradient.setColorAt(1.0, mLineColor);
-      //radialGradient.setSpread(QGradient::ReflectSpread);
       painter->setBrush(radialGradient);
       break;
     case StringHandler::FillSolid:
@@ -620,8 +623,11 @@ void ShapeAnnotation::drawCornerItems()
     for (int i = 0 ; i < mPoints.size() ; i++) {
       QPointF point = mPoints.at(i);
       CornerItem *pCornerItem = new CornerItem(point.x(), point.y(), i, this);
-      /* if line is a connection then make the first and last point non moveable. */
-      if ((lineType == LineAnnotation::ConnectionType) && (i == 0 || i == mPoints.size() - 1)) {
+      /* if line is a connection or transition then make the first and last point non movable.
+       * if line is initial state then make the first point non movable.
+       */
+      if ((((lineType == LineAnnotation::ConnectionType || lineType == LineAnnotation::TransitionType) && (i == 0 || i == mPoints.size() - 1))
+           || (lineType == LineAnnotation::InitialStateType && i == 0))) {
         pCornerItem->setFlag(QGraphicsItem::ItemIsMovable, false);
       }
       mCornerItemsList.append(pCornerItem);
@@ -914,6 +920,9 @@ void ShapeAnnotation::adjustCornerItemsConnectedIndexes()
 void ShapeAnnotation::removeRedundantPointsGeometriesAndCornerItems()
 {
   for (int i = 0 ; i < mPoints.size() ; i++) {
+    if (mPoints.size() <= 2) {
+      break;
+    }
     if ((i+1 < mPoints.size() && mPoints[i].y() == mPoints[i + 1].y() && i+2 < mPoints.size() && mPoints[i + 1].y() == mPoints[i + 2].y()) ||
         (i+1 < mPoints.size() && mPoints[i].x() == mPoints[i + 1].x() && i+2 < mPoints.size() && mPoints[i + 1].x() == mPoints[i + 2].x())) {
       mPoints.removeAt(i + 1);
@@ -1012,6 +1021,9 @@ void ShapeAnnotation::updateVisible()
  */
 void ShapeAnnotation::manhattanizeShape(bool addToStack)
 {
+  if (mSmooth == StringHandler::SmoothBezier) {
+    return;
+  }
   QString oldAnnotation = getOMCShapeAnnotation();
   int startIndex = -1;
   for (int i = 0 ; i < mPoints.size() ; i++) {
@@ -1129,18 +1141,6 @@ void ShapeAnnotation::referenceShapeDeleted()
 }
 
 /*!
-  Slot activated when Delete option is chosen from context menu of the shape.\n
-  Deletes the connection.
-  */
-void ShapeAnnotation::deleteConnection()
-{
-  LineAnnotation *pLineAnnotation = dynamic_cast<LineAnnotation*>(this);
-  if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
-    mpGraphicsView->deleteConnection(pLineAnnotation);
-  }
-}
-
-/*!
  * \brief ShapeAnnotation::deleteMe
  * Deletes the shape. Slot activated when Del key is pressed while the shape is selected.\n
  * Slot activated when Delete option is chosen from context menu of the shape.\n
@@ -1148,7 +1148,16 @@ void ShapeAnnotation::deleteConnection()
 void ShapeAnnotation::deleteMe()
 {
   // delete the shape
-  mpGraphicsView->deleteShape(this);
+  LineAnnotation *pLineAnnotation = dynamic_cast<LineAnnotation*>(this);
+  if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
+    mpGraphicsView->deleteConnection(pLineAnnotation);
+  } else if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+    mpGraphicsView->deleteTransition(pLineAnnotation);
+  } else if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::InitialStateType) {
+    mpGraphicsView->deleteInitialState(pLineAnnotation);
+  } else {
+    mpGraphicsView->deleteShape(this);
+  }
 }
 
 /*!
@@ -1561,6 +1570,21 @@ void ShapeAnnotation::showShapeAttributes()
 }
 
 /*!
+ * \brief ShapeAnnotation::editTransition
+ * Slot activated when edit transition option is chosen from context menu of the transition.
+ */
+void ShapeAnnotation::editTransition()
+{
+  if (!mpGraphicsView) {
+    return;
+  }
+  LineAnnotation *pTransitionLineAnnotation = dynamic_cast<LineAnnotation*>(this);
+  CreateOrEditTransitionDialog *pCreateOrEditTransitionDialog = new CreateOrEditTransitionDialog(mpGraphicsView, pTransitionLineAnnotation,
+                                                                                                 true, MainWindow::instance());
+  pCreateOrEditTransitionDialog->exec();
+}
+
+/*!
  * \brief ShapeAnnotation::alignInterfaces
  * Slot activated when Align Interfaces option is chosen from context menu of the shape.
  */
@@ -1626,12 +1650,12 @@ void ShapeAnnotation::contextMenuEvent(QGraphicsSceneContextMenuEvent *pEvent)
     LineAnnotation::LineType lineType = LineAnnotation::ShapeType;
     if (pLineAnnotation) {
       lineType = pLineAnnotation->getLineType();
-      if (lineType != LineAnnotation::ConnectionType) {
+      if (lineType != LineAnnotation::ConnectionType && lineType != LineAnnotation::TransitionType) {
         menu.addAction(mpGraphicsView->getManhattanizeAction());
       }
     }
     menu.addAction(mpGraphicsView->getDeleteAction());
-    if (lineType != LineAnnotation::ConnectionType) {
+    if (lineType != LineAnnotation::ConnectionType && lineType != LineAnnotation::TransitionType) {
       menu.addAction(mpGraphicsView->getDuplicateAction());
       menu.addSeparator();
       menu.addAction(mpGraphicsView->getBringToFrontAction());
@@ -1641,6 +1665,9 @@ void ShapeAnnotation::contextMenuEvent(QGraphicsSceneContextMenuEvent *pEvent)
       menu.addSeparator();
       menu.addAction(mpGraphicsView->getRotateClockwiseAction());
       menu.addAction(mpGraphicsView->getRotateAntiClockwiseAction());
+    } else if (lineType == LineAnnotation::TransitionType) {
+      menu.addSeparator();
+      menu.addAction(mpEditTransitionAction);
     }
   }
   menu.exec(pEvent->screenPos());
@@ -1667,14 +1694,12 @@ QVariant ShapeAnnotation::itemChange(GraphicsItemChange change, const QVariant &
       setCursor(Qt::SizeAllCursor);
       /* Only allow manipulations on shapes if the class is not a system library class OR shape is not an inherited component. */
       if (!mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() && !isInheritedShape()) {
-        if (lineType == LineAnnotation::ConnectionType) {
-          connect(mpGraphicsView, SIGNAL(mouseDelete()), SLOT(deleteConnection()), Qt::UniqueConnection);
-          connect(mpGraphicsView, SIGNAL(keyPressDelete()), SLOT(deleteConnection()), Qt::UniqueConnection);
-        } else {
-          if (pLineAnnotation) {
-            connect(mpGraphicsView, SIGNAL(mouseManhattanize()), this, SLOT(manhattanizeShape()), Qt::UniqueConnection);
-          }
-          connect(mpGraphicsView, SIGNAL(mouseDelete()), this, SLOT(deleteMe()), Qt::UniqueConnection);
+        if (pLineAnnotation) {
+          connect(mpGraphicsView, SIGNAL(mouseManhattanize()), this, SLOT(manhattanizeShape()), Qt::UniqueConnection);
+        }
+        connect(mpGraphicsView, SIGNAL(mouseDelete()), this, SLOT(deleteMe()), Qt::UniqueConnection);
+        connect(mpGraphicsView, SIGNAL(keyPressDelete()), this, SLOT(deleteMe()), Qt::UniqueConnection);
+        if (lineType == LineAnnotation::ShapeType) {
           connect(mpGraphicsView, SIGNAL(mouseDuplicate()), this, SLOT(duplicate()), Qt::UniqueConnection);
           connect(mpGraphicsView->getBringToFrontAction(), SIGNAL(triggered()), this, SLOT(bringToFront()), Qt::UniqueConnection);
           connect(mpGraphicsView->getBringForwardAction(), SIGNAL(triggered()), this, SLOT(bringForward()), Qt::UniqueConnection);
@@ -1682,7 +1707,6 @@ QVariant ShapeAnnotation::itemChange(GraphicsItemChange change, const QVariant &
           connect(mpGraphicsView->getSendBackwardAction(), SIGNAL(triggered()), this, SLOT(sendBackward()), Qt::UniqueConnection);
           connect(mpGraphicsView, SIGNAL(mouseRotateClockwise()), this, SLOT(rotateClockwise()), Qt::UniqueConnection);
           connect(mpGraphicsView, SIGNAL(mouseRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()), Qt::UniqueConnection);
-          connect(mpGraphicsView, SIGNAL(keyPressDelete()), this, SLOT(deleteMe()), Qt::UniqueConnection);
           connect(mpGraphicsView, SIGNAL(keyPressDuplicate()), this, SLOT(duplicate()), Qt::UniqueConnection);
           connect(mpGraphicsView, SIGNAL(keyPressRotateClockwise()), this, SLOT(rotateClockwise()), Qt::UniqueConnection);
           connect(mpGraphicsView, SIGNAL(keyPressRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()), Qt::UniqueConnection);
@@ -1705,14 +1729,12 @@ QVariant ShapeAnnotation::itemChange(GraphicsItemChange change, const QVariant &
       unsetCursor();
       /* Only allow manipulations on shapes if the class is not a system library class OR shape is not an inherited component. */
       if (!mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() && !isInheritedShape()) {
-        if (lineType == LineAnnotation::ConnectionType) {
-          disconnect(mpGraphicsView, SIGNAL(mouseDelete()), this, SLOT(deleteConnection()));
-          disconnect(mpGraphicsView, SIGNAL(keyPressDelete()), this, SLOT(deleteConnection()));
-        } else {
-          if (pLineAnnotation) {
-            disconnect(mpGraphicsView, SIGNAL(mouseManhattanize()), this, SLOT(manhattanizeShape()));
-          }
-          disconnect(mpGraphicsView, SIGNAL(mouseDelete()), this, SLOT(deleteMe()));
+        if (pLineAnnotation) {
+          disconnect(mpGraphicsView, SIGNAL(mouseManhattanize()), this, SLOT(manhattanizeShape()));
+        }
+        disconnect(mpGraphicsView, SIGNAL(mouseDelete()), this, SLOT(deleteMe()));
+        disconnect(mpGraphicsView, SIGNAL(keyPressDelete()), this, SLOT(deleteMe()));
+        if (lineType == LineAnnotation::ShapeType) {
           disconnect(mpGraphicsView, SIGNAL(mouseDuplicate()), this, SLOT(duplicate()));
           disconnect(mpGraphicsView->getBringToFrontAction(), SIGNAL(triggered()), this, SLOT(bringToFront()));
           disconnect(mpGraphicsView->getBringForwardAction(), SIGNAL(triggered()), this, SLOT(bringForward()));
@@ -1720,7 +1742,6 @@ QVariant ShapeAnnotation::itemChange(GraphicsItemChange change, const QVariant &
           disconnect(mpGraphicsView->getSendBackwardAction(), SIGNAL(triggered()), this, SLOT(sendBackward()));
           disconnect(mpGraphicsView, SIGNAL(mouseRotateClockwise()), this, SLOT(rotateClockwise()));
           disconnect(mpGraphicsView, SIGNAL(mouseRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()));
-          disconnect(mpGraphicsView, SIGNAL(keyPressDelete()), this, SLOT(deleteMe()));
           disconnect(mpGraphicsView, SIGNAL(keyPressDuplicate()), this, SLOT(duplicate()));
           disconnect(mpGraphicsView, SIGNAL(keyPressRotateClockwise()), this, SLOT(rotateClockwise()));
           disconnect(mpGraphicsView, SIGNAL(keyPressRotateAntiClockwise()), this, SLOT(rotateAntiClockwise()));

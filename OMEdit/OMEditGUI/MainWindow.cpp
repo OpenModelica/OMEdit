@@ -274,6 +274,7 @@ void MainWindow::setUpMainWindow()
   mpVariablesDockWidget->setWidget(mpVariablesWidget);
   // create traceability graph view widget
   //  mpTraceabilityGraphViewWidget = new TraceabilityGraphViewWidget(this);
+  mpTraceabilityInformationURI = new TraceabilityInformationURI(this);
 #if !defined(WITHOUT_OSG)
   /* Ticket #4252
    * Do not create an object of ThreeDViewer by default.
@@ -549,7 +550,6 @@ void MainWindow::beforeClosingMainWindow()
       pSettings->setValue("equationsNestedVerticalSplitter", pTransformationsWidget->getEquationsNestedVerticalSplitter()->saveState());
       pSettings->setValue("equationsHorizontalSplitter", pTransformationsWidget->getEquationsHorizontalSplitter()->saveState());
       pSettings->setValue("transformationsVerticalSplitter", pTransformationsWidget->getTransformationsVerticalSplitter()->saveState());
-      pSettings->setValue("transformationsHorizontalSplitter", pTransformationsWidget->getTransformationsHorizontalSplitter()->saveState());
       pSettings->endGroup();
     }
   }
@@ -574,6 +574,8 @@ void MainWindow::beforeClosingMainWindow()
   pSettings->setValue("lastOpenDirectory", StringHandler::getLastOpenDirectory());
   // save the grid lines
   pSettings->setValue("modeling/gridLines", mpShowGridLinesAction->isChecked());
+  // save the splitter state of welcome page
+  pSettings->setValue("welcomePage/splitterState", mpWelcomePageWidget->getSplitter()->saveState());
   delete pSettings;
   // delete the OptionsDialog object
   OptionsDialog::destroy();
@@ -831,7 +833,7 @@ void MainWindow::exportModelFMU(LibraryTreeItem *pLibraryTreeItem)
   //trace export FMU
   if (OptionsDialog::instance()->getTraceabilityPage()->getTraceabilityGroupBox()->isChecked() && !fmuFileName.isEmpty()) {
     //Push traceability information automaticaly to Daemon
-    MainWindow::instance()->getCommitChangesDialog()->generateTraceabilityURI("FMU Export", pLibraryTreeItem->getFileName(), pLibraryTreeItem->getNameStructure(), fmuFileName);
+    MainWindow::instance()->getCommitChangesDialog()->generateTraceabilityURI("fmuExport", pLibraryTreeItem->getFileName(), pLibraryTreeItem->getNameStructure(), fmuFileName);
   }
   // hide progress bar
   hideProgressBar();
@@ -889,31 +891,26 @@ void MainWindow::fetchInterfaceData(LibraryTreeItem *pLibraryTreeItem, QString s
       return;
     }
   }
-  if (OptionsDialog::instance()->getTLMPage()->getTLMManagerProcessTextBox()->text().isEmpty()) {
-    QString message = GUIMessages::getMessage(GUIMessages::TLMMANAGER_NOT_SET).arg(Helper::toolsOptionsPath);
-    QMessageBox::information(this, QString(Helper::applicationName).append(" - ").append(Helper::information), message, Helper::ok);
+  if (pLibraryTreeItem->isSaved()) {
+    fetchInterfaceDataHelper(pLibraryTreeItem, singleModel);
   } else {
-    if (pLibraryTreeItem->isSaved()) {
-      fetchInterfaceDataHelper(pLibraryTreeItem, singleModel);
-    } else {
-      QMessageBox *pMessageBox = new QMessageBox(this);
-      pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::question));
-      pMessageBox->setIcon(QMessageBox::Question);
-      pMessageBox->setAttribute(Qt::WA_DeleteOnClose);
-      pMessageBox->setText(GUIMessages::getMessage(GUIMessages::COMPOSITEMODEL_UNSAVED).arg(pLibraryTreeItem->getNameStructure()));
-      pMessageBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-      pMessageBox->setDefaultButton(QMessageBox::Yes);
-      int answer = pMessageBox->exec();
-      switch (answer) {
-        case QMessageBox::Yes:
-          if (mpLibraryWidget->saveLibraryTreeItem(pLibraryTreeItem)) {
-            fetchInterfaceDataHelper(pLibraryTreeItem, singleModel);
-          }
-          break;
-        case QMessageBox::No:
-        default:
-          break;
-      }
+    QMessageBox *pMessageBox = new QMessageBox(this);
+    pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::question));
+    pMessageBox->setIcon(QMessageBox::Question);
+    pMessageBox->setAttribute(Qt::WA_DeleteOnClose);
+    pMessageBox->setText(GUIMessages::getMessage(GUIMessages::COMPOSITEMODEL_UNSAVED).arg(pLibraryTreeItem->getNameStructure()));
+    pMessageBox->setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+    pMessageBox->setDefaultButton(QMessageBox::Yes);
+    int answer = pMessageBox->exec();
+    switch (answer) {
+      case QMessageBox::Yes:
+        if (mpLibraryWidget->saveLibraryTreeItem(pLibraryTreeItem)) {
+          fetchInterfaceDataHelper(pLibraryTreeItem, singleModel);
+        }
+        break;
+      case QMessageBox::No:
+      default:
+        break;
     }
   }
 }
@@ -2312,6 +2309,9 @@ void MainWindow::toggleShapesButton()
     if (pGraphicsView->isCreatingConnection()) {
       pGraphicsView->removeCurrentConnection();
     }
+    if (pGraphicsView->isCreatingTransition()) {
+      pGraphicsView->removeCurrentTransition();
+    }
   }
 }
 
@@ -3079,6 +3079,11 @@ void MainWindow::createActions()
   mpConnectModeAction->setCheckable(true);
   mpConnectModeAction->setChecked(true);
   connect(mpConnectModeAction, SIGNAL(triggered()), SLOT(toggleShapesButton()));
+  // transition mode action
+  mpTransitionModeAction = new QAction(QIcon(":/Resources/icons/transition-mode.svg"), tr("Transition Mode"), this);
+  mpTransitionModeAction->setStatusTip(tr("Changes to/from transition mode"));
+  mpTransitionModeAction->setCheckable(true);
+  mpTransitionModeAction->setChecked(true);
   // model switcher actions
   for (int i = 0; i < MaxRecentFiles; ++i) {
     mpModelSwitcherActions[i] = new QAction(this);
@@ -3101,7 +3106,18 @@ void MainWindow::createActions()
   mpNewParametricPlotWindowAction = new QAction(QIcon(":/Resources/icons/parametric-plot-window.svg"), tr("New Parametric Plot Window"), this);
   mpNewParametricPlotWindowAction->setStatusTip(tr("Inserts new parametric plot window"));
   connect(mpNewParametricPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addParametricPlotWindow()));
-#if !defined(WITHOUT_OSG)
+
+  // new array plot window action
+  mpNewArrayPlotWindowAction = new QAction(QIcon(":/Resources/icons/array-plot-window.svg"), tr("New Array Plot Window"), this);
+  mpNewArrayPlotWindowAction->setStatusTip(tr("Inserts new array plot window"));
+  connect(mpNewArrayPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addArrayPlotWindow()));
+
+  // new array parametric plot window action
+  mpNewArrayParametricPlotWindowAction = new QAction(QIcon(":/Resources/icons/array-parametric-plot-window.svg"), tr("New Array Parametric Plot Window"), this);
+  mpNewArrayParametricPlotWindowAction->setStatusTip(tr("Inserts new array parametric plot window"));
+  connect(mpNewArrayParametricPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addArrayParametricPlotWindow()));
+
+  #if !defined(WITHOUT_OSG)
   // new mpAnimationWindowAction plot action
   mpNewAnimationWindowAction = new QAction(QIcon(":/Resources/icons/animation.svg"), tr("New Animation Window"), this);
   mpNewAnimationWindowAction->setStatusTip(tr("Inserts new animation window"));
@@ -3668,6 +3684,20 @@ void MainWindow::createToolbars()
   mpShapesToolBar->addAction(mpBitmapShapeAction);
   mpShapesToolBar->addSeparator();
   mpShapesToolBar->addAction(mpConnectModeAction);
+  mpShapesToolBar->addSeparator();
+  mpShapesToolBar->addAction(mpTransitionModeAction);
+  // Simulation Toolbar
+  mpSimulationToolBar = addToolBar(tr("Simulation Toolbar"));
+  mpSimulationToolBar->setObjectName("Simulation Toolbar");
+  mpSimulationToolBar->setAllowedAreas(Qt::TopToolBarArea);
+  // add actions to Simulation Toolbar
+  mpSimulationToolBar->addAction(mpInstantiateModelAction);
+  mpSimulationToolBar->addAction(mpCheckModelAction);
+  mpSimulationToolBar->addAction(mpCheckAllModelsAction);
+  mpSimulationToolBar->addAction(mpSimulateModelAction);
+  mpSimulationToolBar->addAction(mpSimulateWithTransformationalDebuggerAction);
+  mpSimulationToolBar->addAction(mpSimulateWithAlgorithmicDebuggerAction);
+  mpSimulationToolBar->addAction(mpSimulationSetupAction);
   // Model Swithcer Toolbar
   mpModelSwitcherToolBar = addToolBar(tr("ModelSwitcher Toolbar"));
   mpModelSwitcherToolBar->setObjectName("ModelSwitcher Toolbar");
@@ -3720,6 +3750,8 @@ void MainWindow::createToolbars()
   // add actions to Plot Toolbar
   mpPlotToolBar->addAction(mpNewPlotWindowAction);
   mpPlotToolBar->addAction(mpNewParametricPlotWindowAction);
+  mpPlotToolBar->addAction(mpNewArrayPlotWindowAction);
+  mpPlotToolBar->addAction(mpNewArrayParametricPlotWindowAction);
 #if !defined(WITHOUT_OSG)
   mpPlotToolBar->addAction(mpNewAnimationWindowAction);
   mpPlotToolBar->addSeparator();

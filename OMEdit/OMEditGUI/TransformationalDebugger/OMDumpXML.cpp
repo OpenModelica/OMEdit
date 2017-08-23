@@ -33,7 +33,6 @@
  */
 
 #include "OMDumpXML.h"
-#include "diff_match_patch.h"
 
 #include <QDebug>
 #include <QXmlStreamReader>
@@ -44,8 +43,9 @@ QString OMOperation::toString()
   return "unknown operation";
 }
 
-QString OMOperation::toHtml()
+QString OMOperation::toHtml(HtmlDiff htmlDiff)
 {
+  Q_UNUSED(htmlDiff);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
   return QString(toString()).toHtmlEscaped();
 #else /* Qt4 */
@@ -53,13 +53,13 @@ QString OMOperation::toHtml()
 #endif
 }
 
-QString OMOperation::diffHtml(QString &before, QString &after)
+QString OMOperation::diffHtml(QString &before, QString &after, HtmlDiff htmlDiff)
 {
   diff_match_patch dmp;
   dmp.Diff_EditCost = 6;
   QList<Diff> diffs = dmp.diff_main(before,after);
   dmp.diff_cleanupSemanticLossless(diffs);
-  return dmp.diff_prettyHtml(diffs);
+  return dmp.diff_prettyHtml(diffs, htmlDiff);
 }
 
 OMOperationInfo::OMOperationInfo(QString name, QString info) : name(name), info(info)
@@ -71,8 +71,9 @@ QString OMOperationInfo::toString()
   return name + ": " + info;
 }
 
-QString OMOperationInfo::toHtml()
+QString OMOperationInfo::toHtml(HtmlDiff htmlDiff = HtmlDiff::Both)
 {
+  Q_UNUSED(htmlDiff);
   return toString();
 }
 
@@ -87,9 +88,9 @@ QString OMOperationBeforeAfter::toString()
   return name + ": " + before + " => " + after;
 }
 
-QString OMOperationBeforeAfter::toHtml()
+QString OMOperationBeforeAfter::toHtml(HtmlDiff htmlDiff = HtmlDiff::Both)
 {
-  return name + ": " + diffHtml(before,after);
+  return name + ": " + diffHtml(before, after, htmlDiff);
 }
 
 OMOperationScalarize::OMOperationScalarize(int _index, QStringList ops)
@@ -248,24 +249,26 @@ QString OMEquation::toString()
 {
   if (tag == "dummy") {
     return "";
-  } else if (tag == "assign") {
+  } else if (tag == "assign" || tag == "torn" || tag == "jacobian") {
     if (text.size()==1) {
-     return QString("%1 := %2").arg(defines[0]).arg(text[0]);
+     return QString("(%1) %2 := %3").arg(tag).arg(defines[0]).arg(text[0]);
     } else {
-     return QString("%1 := %2").arg(text[0]).arg(text[1]);
+     return QString("(%1) %2 := %3").arg(tag).arg(text[0]).arg(text[1]);
     }
   } else if (tag == "statement" || tag == "algorithm") {
     return text.join("\n");
-  } else if (tag == "container") {
-    return QString("%1, size %2").arg(display).arg(eqs.size());
+  } else if (tag == "system") {
+    return QString("%1, unknowns: %2, iteration variables: %3").arg(display).arg(unknowns).arg(defines.size());
+  } else if (tag == "tornsystem") {
+    return QString("%1 (torn), unknowns: %2, iteration variables: %3").arg(display).arg(unknowns).arg(defines.size());
   } else if (tag == "nonlinear") {
     return QString("nonlinear, size %1").arg(eqs.size());
   } else if (tag == "linear") {
     return QString("linear, size %1").arg(defines.size());
   } else if (tag == "residual") {
-    return text[0] + " (residual)";
+    return "(residual) " + text[0] + " = 0";
   } else {
-    return "(" + display + "): " + text.join(",");
+    return "(" + display + ") " + text.join(",");
   }
 }
 

@@ -125,7 +125,13 @@ void SimulationDialog::directSimulate(LibraryTreeItem *pLibraryTreeItem, bool la
 #else
   assert(false==launchAnimation);
 #endif
+  /* ticket:4440 OMEdit does not simulate
+   * Make sure we always simulate when directSimulate() is called.
+   */
+  bool simulateCheckBoxState = mpSimulateCheckBox->isChecked();
+  mpSimulateCheckBox->setChecked(true);
   simulate();
+  mpSimulateCheckBox->setChecked(simulateCheckBoxState);
 }
 
 /*!
@@ -171,12 +177,15 @@ void SimulationDialog::setUpForm()
   pSimulationIntervalGridLayout->setColumnStretch(1, 1);
   pSimulationIntervalGridLayout->addWidget(mpStartTimeLabel, 0, 0);
   pSimulationIntervalGridLayout->addWidget(mpStartTimeTextBox, 0, 1);
+  pSimulationIntervalGridLayout->addWidget(new Label(Helper::secs), 0, 2);
   pSimulationIntervalGridLayout->addWidget(mpStopTimeLabel, 1, 0);
   pSimulationIntervalGridLayout->addWidget(mpStopTimeTextBox, 1, 1);
+  pSimulationIntervalGridLayout->addWidget(new Label(Helper::secs), 1, 2);
   pSimulationIntervalGridLayout->addWidget(mpNumberofIntervalsRadioButton, 2, 0);
-  pSimulationIntervalGridLayout->addWidget(mpNumberofIntervalsSpinBox, 2, 1);
+  pSimulationIntervalGridLayout->addWidget(mpNumberofIntervalsSpinBox, 2, 1, 1, 2);
   pSimulationIntervalGridLayout->addWidget(mpIntervalRadioButton, 3, 0);
   pSimulationIntervalGridLayout->addWidget(mpIntervalTextBox, 3, 1);
+  pSimulationIntervalGridLayout->addWidget(new Label(Helper::secs), 3, 2);
   mpSimulationIntervalGroupBox->setLayout(pSimulationIntervalGridLayout);
   // Integration
   mpIntegrationGroupBox = new QGroupBox(tr("Integration"));
@@ -805,6 +814,10 @@ bool SimulationDialog::translateModel(QString simulationParameters)
 {
   // reset simulation setting
   OptionsDialog::instance()->saveSimulationSettings();
+  // set the infoXMLOperations flag
+  if (OptionsDialog::instance()->getDebuggerPage()->getGenerateOperationsCheckBox()->isChecked()) {
+    MainWindow::instance()->getOMCProxy()->setCommandLineOptions("-d=infoXmlOperations");
+  }
   // check reset messages number before simulation option
   if (OptionsDialog::instance()->getMessagesPage()->getResetMessagesNumberBeforeSimulationCheckBox()->isChecked()) {
     MessagesWidget::instance()->resetMessagesNumber();
@@ -832,6 +845,10 @@ bool SimulationDialog::translateModel(QString simulationParameters)
   bool result = MainWindow::instance()->getOMCProxy()->translateModel(mClassName, simulationParameters);
   // reset simulation setting
   OptionsDialog::instance()->saveSimulationSettings();
+  // set the infoXMLOperations flag
+  if (OptionsDialog::instance()->getDebuggerPage()->getGenerateOperationsCheckBox()->isChecked()) {
+    MainWindow::instance()->getOMCProxy()->setCommandLineOptions("-d=infoXmlOperations");
+  }
   return result;
 }
 

@@ -386,8 +386,6 @@ void VisualizerAbstract::pauseVisualization()
 }
 
 
-
-
 OMVisScene::OMVisScene()
   : _scene()
 {

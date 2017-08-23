@@ -32,6 +32,7 @@
  * @author Adeel Asghar <adeel.asghar@liu.se>
  */
 
+#include "MainWindow.h"
 #include "TransformationsWidget.h"
 #include "Options/OptionsDialog.h"
 #include "Util/StringHandler.h"
@@ -39,6 +40,7 @@
 #include "Editors/TransformationsEditor.h"
 #include "Editors/ModelicaEditor.h"
 #include <qjson/parser.h>
+#include "diff_match_patch.h"
 
 #include <QStatusBar>
 #include <QGridLayout>
@@ -457,6 +459,7 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
     mProfJSONFullFileName = infoJSONFullFileName.left(infoJSONFullFileName.size() - 9) + "prof.json";
     mProfilingDataRealFileName = infoJSONFullFileName.left(infoJSONFullFileName.size() - 9) + "prof.realdata";
   }
+  mCurrentEquationIndex = 0;
   setWindowIcon(QIcon(":/Resources/icons/equational-debugger.svg"));
   setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::transformationalDebugger));
   QToolButton *pReloadToolButton = new QToolButton;
@@ -594,6 +597,15 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
   /* operations tree widget */
   Label *pEquationOperationsLabel = new Label(tr("Equation Operations"));
   pEquationOperationsLabel->setObjectName("LabelWithBorder");
+  mpEquationDiffFilterComboBox = new QComboBox;
+  mpEquationDiffFilterComboBox->addItem(tr("Diff"), HtmlDiff::Both);
+  mpEquationDiffFilterComboBox->addItem(tr("After"), HtmlDiff::Insertion);
+  mpEquationDiffFilterComboBox->addItem(tr("Before"), HtmlDiff::Deletion);
+  connect(mpEquationDiffFilterComboBox, SIGNAL(currentIndexChanged(int)), SLOT(filterEquationOperations(int)));
+  QHBoxLayout *pEquationTransformationFilterLayout = new QHBoxLayout;
+  pEquationTransformationFilterLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  pEquationTransformationFilterLayout->addWidget(new Label(tr("Transformation:")));
+  pEquationTransformationFilterLayout->addWidget(mpEquationDiffFilterComboBox);
   mpEquationOperationsTreeWidget = new QTreeWidget;
   mpEquationOperationsTreeWidget->setItemDelegate(new ItemDelegate(mpEquationOperationsTreeWidget));
   mpEquationOperationsTreeWidget->setIndentation(0);
@@ -604,7 +616,8 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
   pEquationOperationsGridLayout->setSpacing(1);
   pEquationOperationsGridLayout->setContentsMargins(0, 0, 0, 0);
   pEquationOperationsGridLayout->addWidget(pEquationOperationsLabel, 0, 0);
-  pEquationOperationsGridLayout->addWidget(mpEquationOperationsTreeWidget, 1, 0);
+  pEquationOperationsGridLayout->addLayout(pEquationTransformationFilterLayout, 1, 0, Qt::AlignLeft);
+  pEquationOperationsGridLayout->addWidget(mpEquationOperationsTreeWidget, 2, 0);
   QFrame *pEquationOperationsFrame = new QFrame;
   pEquationOperationsFrame->setLayout(pEquationOperationsGridLayout);
   /* TSourceEditor */
@@ -705,16 +718,9 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
   mpTransformationsVerticalSplitter->setChildrenCollapsible(false);
   mpTransformationsVerticalSplitter->setHandleWidth(4);
   mpTransformationsVerticalSplitter->setContentsMargins(0, 0, 0, 0);
+  mpTransformationsVerticalSplitter->addWidget(pTSourceEditorFrame);
   mpTransformationsVerticalSplitter->addWidget(pVariablesMainFrame);
   mpTransformationsVerticalSplitter->addWidget(pEquationsMainFrame);
-  /* Transformations horizontal splitter */
-  mpTransformationsHorizontalSplitter = new QSplitter;
-  mpTransformationsHorizontalSplitter->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  mpTransformationsHorizontalSplitter->setChildrenCollapsible(false);
-  mpTransformationsHorizontalSplitter->setHandleWidth(4);
-  mpTransformationsHorizontalSplitter->setContentsMargins(0, 0, 0, 0);
-  mpTransformationsHorizontalSplitter->addWidget(mpTransformationsVerticalSplitter);
-  mpTransformationsHorizontalSplitter->addWidget(pTSourceEditorFrame);
   /* Load the transformations before setting the layout */
   loadTransformations();
   /* set the layout */
@@ -722,7 +728,7 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
   pMainLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   pMainLayout->setContentsMargins(0, 0, 0, 0);
   pMainLayout->addWidget(pStatusBar, 0, 0);
-  pMainLayout->addWidget(mpTransformationsHorizontalSplitter, 1, 0);
+  pMainLayout->addWidget(mpTransformationsVerticalSplitter, 1, 0);
   setLayout(pMainLayout);
   /* restore the TransformationsWidget geometry and splitters state. */
   QSettings *pSettings = Utilities::getApplicationSettings();
@@ -737,7 +743,6 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
     mpEquationsNestedVerticalSplitter->restoreState(pSettings->value("equationsNestedVerticalSplitter").toByteArray());
     mpEquationsHorizontalSplitter->restoreState(pSettings->value("equationsHorizontalSplitter").toByteArray());
     mpTransformationsVerticalSplitter->restoreState(pSettings->value("transformationsVerticalSplitter").toByteArray());
-    mpTransformationsHorizontalSplitter->restoreState(pSettings->value("transformationsHorizontalSplitter").toByteArray());
     pSettings->endGroup();
   }
 }
@@ -745,8 +750,7 @@ TransformationsWidget::TransformationsWidget(QString infoJSONFullFileName, QWidg
 static QStringList variantListToStringList(const QVariantList lst)
 {
   QStringList strs;
-  foreach(QVariant v, lst){
-    QString s = v.toString();
+  foreach(QVariant v, lst) {
     strs << v.toString().trimmed();
   }
   return strs;
@@ -825,8 +829,9 @@ void TransformationsWidget::loadTransformations()
       OMVariable *var = new OMVariable();
       var->name = iter.key();
       var->comment = value["comment"].toString();
+      QVariantMap sourceMap = value["source"].toMap();
       variantToSource(value["source"].toMap(), var->info, var->types, var->ops);
-      if (!hasOperationsEnabled && var->ops.size() > 0) {
+      if (!hasOperationsEnabled && sourceMap.contains("operations")) {
         hasOperationsEnabled = true;
       }
       mVariables[iter.key()] = *var;
@@ -870,8 +875,10 @@ void TransformationsWidget::loadTransformations()
       } else {
         eq->display = eq->tag;
       }
+      eq->unknowns = veq["unknowns"].toInt();
+      QVariantMap sourceMap = veq["source"].toMap();
       variantToSource(veq["source"].toMap(), eq->info, eq->types, eq->ops);
-      if (!hasOperationsEnabled && eq->ops.size() > 0) {
+      if (!hasOperationsEnabled && sourceMap.contains("operations")) {
         hasOperationsEnabled = true;
       }
     }
@@ -1030,12 +1037,13 @@ void TransformationsWidget::fetchEquationData(int equationIndex)
   if (!equation) {
     return;
   }
+  mCurrentEquationIndex = equationIndex;
   /* fetch defines */
   fetchDefines(equation);
   /* fetch depends */
   fetchDepends(equation);
   /* fetch operations */
-  fetchOperations(equation);
+  fetchOperations(equation, (HtmlDiff)mpEquationDiffFilterComboBox->itemData(mpEquationDiffFilterComboBox->currentIndex()).toInt());
 
   /* TODO: This data is correct. Add this to some widget thingy somewhere.
    * Maybe a small one that you can click to enlarge.
@@ -1074,7 +1082,16 @@ void TransformationsWidget::fetchEquationData(int equationIndex)
     return;
   }
   /* open the model with and go to the equation line */
-  QFile file(equation->info.file);
+  QString fileName = equation->info.file;
+  QFileInfo fileInfo(fileName);
+  if (fileInfo.isRelative()) {
+    // find the class
+    LibraryTreeItem *pLibraryTreeItem = MainWindow::instance()->getLibraryWidget()->getLibraryTreeModel()->findLibraryTreeItem(fileName);
+    if (pLibraryTreeItem) {
+      fileName = pLibraryTreeItem->getFileName();
+    }
+  }
+  QFile file(fileName);
   if (file.exists()) {
     mpTSourceEditorFileLabel->setText(file.fileName());
     mpTSourceEditorFileLabel->show();
@@ -1083,6 +1100,7 @@ void TransformationsWidget::fetchEquationData(int equationIndex)
     mpTSourceEditorInfoBar->hide();
     file.close();
     mpTransformationsEditor->getPlainTextEdit()->goToLineNumber(equation->info.lineStart);
+    mpTransformationsEditor->getPlainTextEdit()->foldAll();
   }
 }
 
@@ -1096,6 +1114,14 @@ void TransformationsWidget::fetchDefines(OMEquation *equation)
       QStringList values;
       values << define;
       QString toolTip = define;
+      QTreeWidgetItem *pDefineTreeItem = new QTreeWidgetItem(values);
+      pDefineTreeItem->setToolTip(0, toolTip);
+      mpDefinesVariableTreeWidget->addTopLevelItem(pDefineTreeItem);
+    }
+    if ((equation->tag.compare("residual") == 0) && (equation->defines.isEmpty())) {
+      QStringList values;
+      values << QString("Part of an implicit system of equations");
+      QString toolTip = values.at(0);
       QTreeWidgetItem *pDefineTreeItem = new QTreeWidgetItem(values);
       pDefineTreeItem->setToolTip(0, toolTip);
       mpDefinesVariableTreeWidget->addTopLevelItem(pDefineTreeItem);
@@ -1122,7 +1148,7 @@ void TransformationsWidget::fetchDepends(OMEquation *equation)
   }
 }
 
-void TransformationsWidget::fetchOperations(OMEquation *equation)
+void TransformationsWidget::fetchOperations(OMEquation *equation, HtmlDiff htmlDiff)
 {
   /* Clear the operations tree. */
   clearTreeWidgetItems(mpEquationOperationsTreeWidget);
@@ -1133,7 +1159,7 @@ void TransformationsWidget::fetchOperations(OMEquation *equation)
         QTreeWidgetItem *pOperationTreeItem = new QTreeWidgetItem();
         mpEquationOperationsTreeWidget->addTopLevelItem(pOperationTreeItem);
         // set label item
-        Label *opText = new Label("<html><div style=\"margin:3px;\">" + op->toHtml() + "</div></html>");
+        Label *opText = new Label("<html><div style=\"margin:3px;\">" + op->toHtml(htmlDiff) + "</div></html>");
         mpEquationOperationsTreeWidget->setItemWidget(pOperationTreeItem, 0, opText);
       }
     }
@@ -1162,6 +1188,7 @@ void TransformationsWidget::clearTreeWidgetItems(QTreeWidget *pTreeWidget)
 
 void TransformationsWidget::reloadTransformations()
 {
+  mCurrentEquationIndex = 0;
   /* clear trees */
   mpTVariablesTreeModel->clearTVariablesTreeItems();
   /* Clear the defined in tree. */
@@ -1237,7 +1264,16 @@ void TransformationsWidget::fetchVariableData(const QModelIndex &index)
   if (!variable.info.isValid)
     return;
   /* open the model with and go to the variable line */
-  QFile file(variable.info.file);
+  QString fileName = variable.info.file;
+  QFileInfo fileInfo(fileName);
+  if (fileInfo.isRelative()) {
+    // find the class
+    LibraryTreeItem *pLibraryTreeItem = MainWindow::instance()->getLibraryWidget()->getLibraryTreeModel()->findLibraryTreeItem(fileName);
+    if (pLibraryTreeItem) {
+      fileName = pLibraryTreeItem->getFileName();
+    }
+  }
+  QFile file(fileName);
   if (file.exists()) {
     mpTSourceEditorFileLabel->setText(file.fileName());
     mpTSourceEditorFileLabel->show();
@@ -1246,28 +1282,40 @@ void TransformationsWidget::fetchVariableData(const QModelIndex &index)
     mpTSourceEditorInfoBar->hide();
     file.close();
     mpTransformationsEditor->getPlainTextEdit()->goToLineNumber(variable.info.lineStart);
+    mpTransformationsEditor->getPlainTextEdit()->foldAll();
   }
 }
 
 void TransformationsWidget::fetchEquationData(QTreeWidgetItem *pEquationTreeItem, int column)
 {
   Q_UNUSED(column);
-  if (!pEquationTreeItem)
+  if (!pEquationTreeItem) {
     return;
+  }
 
   int equationIndex = pEquationTreeItem->text(0).toInt();
   /* if the sender is mpEquationsTreeWidget then there is no need to select the item. */
   EquationTreeWidget *pSender = qobject_cast<EquationTreeWidget*>(sender());
-  if (pSender != mpEquationsTreeWidget)
-  {
+  if (pSender != mpEquationsTreeWidget) {
     QTreeWidgetItem *pTreeWidgetItem = findEquationTreeItem(equationIndex);
-    if (pTreeWidgetItem)
-    {
+    if (pTreeWidgetItem) {
       mpEquationsTreeWidget->clearSelection();
       mpEquationsTreeWidget->setCurrentItem(pTreeWidgetItem);
     }
   }
   fetchEquationData(equationIndex);
+}
+
+void TransformationsWidget::filterEquationOperations(int index)
+{
+  if (mCurrentEquationIndex < 1) {
+    return;
+  }
+  OMEquation *equation = getOMEquation(mEquations, mCurrentEquationIndex);
+  if (!equation) {
+    return;
+  }
+  fetchOperations(equation, (HtmlDiff)mpEquationDiffFilterComboBox->itemData(index).toInt());
 }
 
 void TransformationsWidget::parseProfiling(QString fileName)

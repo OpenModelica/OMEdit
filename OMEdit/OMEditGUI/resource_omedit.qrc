@@ -26,6 +26,7 @@
         <file>Resources/icons/simulate-equation.svg</file>
         <file>Resources/icons/simulate-debug.svg</file>
         <file>Resources/icons/simulate-animation.svg</file>
+        <file>Resources/icons/control-panel.svg</file>
         <file>Resources/icons/simulation-center.svg</file>
         <file>Resources/css/stylesheet.qss</file>
         <file>Resources/icons/check.svg</file>
@@ -81,6 +82,7 @@
         <file>Resources/icons/fill-vertical-cylinder.svg</file>
         <file>Resources/icons/omplot.png</file>
         <file>Resources/icons/parametric-plot-window.svg</file>
+        <file>Resources/icons/array-plot-window.svg</file>
         <file>Resources/icons/plot-window.svg</file>
         <file>Resources/icons/re-simulate.svg</file>
         <file>Resources/icons/re-simulation-center.svg</file>
@@ -105,6 +107,7 @@
         <file>Resources/icons/flip-horizontal.svg</file>
         <file>Resources/icons/flip-vertical.svg</file>
         <file>Resources/icons/connect-mode.svg</file>
+        <file>Resources/icons/transition-mode.svg</file>
         <file>Resources/icons/export-xml.svg</file>
         <file>Resources/icons/optimization-icon.svg</file>
         <file>Resources/icons/refresh.svg</file>
@@ -178,5 +181,7 @@
         <file>Resources/icons/completerkeyword.svg</file>
         <file>Resources/icons/completerType.svg</file>
         <file>Resources/icons/completerCodeSnippets.svg</file>
+        <file>Resources/icons/array-parametric-plot-window.svg</file>
+        <file>Resources/icons/update.svg</file>
     </qresource>
 </RCC>
