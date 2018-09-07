@@ -83,6 +83,7 @@ private:
   QTextStream mCommunicationLogFileTextStream;
   QFile mCommandsMosFile;
   QTextStream mCommandsLogFileTextStream;
+  double mTotalOMCCallsTime;
   MainWindow *mpMainWindow;
   int mAnnotationVersion;
   OMCInterface *mpOMCInterface;

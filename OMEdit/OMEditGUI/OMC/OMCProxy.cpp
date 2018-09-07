@@ -92,7 +92,7 @@ static QVariant parseExpression(QString result)
   \param pMainWindow - pointer to MainWindow
   */
 OMCProxy::OMCProxy(MainWindow *pMainWindow)
-  : QObject(pMainWindow), mHasInitialized(false), mResult("")
+  : QObject(pMainWindow), mHasInitialized(false), mResult(""), mTotalOMCCallsTime(0.0)
 {
   mpMainWindow = pMainWindow;
   mCurrentCommandIndex = -1;
