@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -34,6 +34,8 @@
 
 #include "BitmapAnnotation.h"
 #include "Modeling/Commands.h"
+
+#include <QMessageBox>
 
 BitmapAnnotation::BitmapAnnotation(QString classFileName, QString annotation, GraphicsView *pGraphicsView)
   : ShapeAnnotation(false, pGraphicsView, 0)
@@ -73,6 +75,38 @@ BitmapAnnotation::BitmapAnnotation(ShapeAnnotation *pShapeAnnotation, GraphicsVi
   connect(pShapeAnnotation, SIGNAL(added()), this, SLOT(referenceShapeAdded()));
   connect(pShapeAnnotation, SIGNAL(changed()), this, SLOT(referenceShapeChanged()));
   connect(pShapeAnnotation, SIGNAL(deleted()), this, SLOT(referenceShapeDeleted()));
+}
+
+/*!
+ * \brief BitmapAnnotation::BitmapAnnotation
+ * Used by OMSimulator FMU ModelWidget\n
+ * We always make this shape as inherited shape since its not allowed to be modified.
+ * \param classFileName
+ * \param pGraphicsView
+ */
+BitmapAnnotation::BitmapAnnotation(QString classFileName, GraphicsView *pGraphicsView)
+  : ShapeAnnotation(true, pGraphicsView, 0)
+{
+  mpComponent = 0;
+  mClassFileName = classFileName;
+  // set the default values
+  GraphicItem::setDefaults();
+  ShapeAnnotation::setDefaults();
+  // set users default value by reading the settings file.
+  ShapeAnnotation::setUserDefaults();
+  QList<QPointF> extents;
+  extents << QPointF(-100, -100) << QPointF(100, 100);
+  setExtents(extents);
+  setPos(mOrigin);
+  setRotation(mRotation);
+  setShapeFlags(true);
+
+  setFileName(mClassFileName);
+  if (!mFileName.isEmpty()) {
+    mImage.load(mFileName);
+  } else {
+    mImage = QImage(":/Resources/icons/bitmap-shape.svg");
+  }
 }
 
 void BitmapAnnotation::parseShapeAnnotation(QString annotation)

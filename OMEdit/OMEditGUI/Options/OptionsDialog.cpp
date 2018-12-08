@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -35,6 +35,10 @@
 #include "OptionsDialog.h"
 #include "MainWindow.h"
 #include "OMC/OMCProxy.h"
+#include "OMS/OMSProxy.h"
+#include "Modeling/LibraryTreeWidget.h"
+#include "Modeling/ItemDelegate.h"
+#include "Modeling/ModelWidgetContainer.h"
 #include "Modeling/MessagesWidget.h"
 #include "Plotting/PlotWindowContainer.h"
 #include "Debugger/StackFrames/StackFramesWidget.h"
@@ -87,6 +91,9 @@ OptionsDialog::OptionsDialog(QWidget *pParent)
   mpCompositeModelEditorPage = new CompositeModelEditorPage(this);
   connect(mpTextEditorPage->getFontFamilyComboBox(), SIGNAL(currentFontChanged(QFont)), mpCompositeModelEditorPage, SIGNAL(updatePreview()));
   connect(mpTextEditorPage->getFontSizeSpinBox(), SIGNAL(valueChanged(double)), mpCompositeModelEditorPage, SIGNAL(updatePreview()));
+  mpOMSimulatorEditorPage = new OMSimulatorEditorPage(this);
+  connect(mpTextEditorPage->getFontFamilyComboBox(), SIGNAL(currentFontChanged(QFont)), mpOMSimulatorEditorPage, SIGNAL(updatePreview()));
+  connect(mpTextEditorPage->getFontSizeSpinBox(), SIGNAL(valueChanged(double)), mpOMSimulatorEditorPage, SIGNAL(updatePreview()));
   mpCEditorPage = new CEditorPage(this);
   connect(mpTextEditorPage->getFontFamilyComboBox(), SIGNAL(currentFontChanged(QFont)), mpCEditorPage, SIGNAL(updatePreview()));
   connect(mpTextEditorPage->getFontSizeSpinBox(), SIGNAL(valueChanged(double)), mpCEditorPage, SIGNAL(updatePreview()));
@@ -104,6 +111,7 @@ OptionsDialog::OptionsDialog(QWidget *pParent)
   mpDebuggerPage = new DebuggerPage(this);
   mpFMIPage = new FMIPage(this);
   mpTLMPage = new TLMPage(this);
+  mpOMSimulatorPage = new OMSimulatorPage(this);
   mpTraceabilityPage = new TraceabilityPage(this);
   // get the settings
   readSettings();
@@ -127,6 +135,9 @@ void OptionsDialog::readSettings()
   readCompositeModelEditorSettings();
   emit compositeModelEditorSettingsChanged();
   mpCompositeModelEditorPage->emitUpdatePreview();
+  readOMSimulatorEditorSettings();
+  emit omsimulatorEditorSettingsChanged();
+  mpOMSimulatorEditorPage->emitUpdatePreview();
   readCEditorSettings();
   emit cEditorSettingsChanged();
   mpCEditorPage->emitUpdatePreview();
@@ -144,6 +155,7 @@ void OptionsDialog::readSettings()
   readDebuggerSettings();
   readFMISettings();
   readTLMSettings();
+  readOMSimulatorSettings();
   readTraceabilitySettings();
 }
 
@@ -183,6 +195,10 @@ void OptionsDialog::readGeneralSettings()
   // read hide variables browser
   if (mpSettings->contains("hideVariablesBrowser")) {
     mpGeneralSettingsPage->getHideVariablesBrowserCheckBox()->setChecked(mpSettings->value("hideVariablesBrowser").toBool());
+  }
+  // read activate access annotations
+  if (mpSettings->contains("activateAccessAnnotations")) {
+    mpGeneralSettingsPage->getActivateAccessAnnotationsCheckBox()->setChecked(mpSettings->value("activateAccessAnnotations").toBool());
   }
   // read library icon size
   if (mpSettings->contains("libraryIconSize")) {
@@ -406,6 +422,29 @@ void OptionsDialog::readCompositeModelEditorSettings()
 }
 
 /*!
+ * \brief OptionsDialog::readOMSCompositeModelEditorSettings
+ * Reads the OMSCompositeModelEditor settings from omedit.ini
+ */
+void OptionsDialog::readOMSimulatorEditorSettings()
+{
+  if (mpSettings->contains("omsimulatorEditor/textRuleColor")) {
+    mpOMSimulatorEditorPage->setColor("Text", QColor(mpSettings->value("omsimulatorEditor/textRuleColor").toUInt()));
+  }
+  if (mpSettings->contains("omsimulatorEditor/commentRuleColor")) {
+    mpOMSimulatorEditorPage->setColor("Comment", QColor(mpSettings->value("omsimulatorEditor/commentRuleColor").toUInt()));
+  }
+  if (mpSettings->contains("omsimulatorEditor/tagRuleColor")) {
+    mpOMSimulatorEditorPage->setColor("Tag", QColor(mpSettings->value("omsimulatorEditor/tagRuleColor").toUInt()));
+  }
+  if (mpSettings->contains("omsimulatorEditor/quotesRuleColor")) {
+    mpOMSimulatorEditorPage->setColor("Quotes", QColor(mpSettings->value("omsimulatorEditor/quotesRuleColor").toUInt()));
+  }
+  if (mpSettings->contains("omsimulatorEditor/elementsRuleColor")) {
+    mpOMSimulatorEditorPage->setColor("Element", QColor(mpSettings->value("omsimulatorEditor/elementsRuleColor").toUInt()));
+  }
+}
+
+/*!
  * \brief OptionsDialog::readCEditorSettings
  * Reads the CEditor settings from omedit.ini
  */
@@ -510,13 +549,13 @@ void OptionsDialog::readSimulationSettings()
     }
   }
   if (mpSettings->contains("simulation/targetCompiler")) {
-    int currentIndex = mpSimulationPage->getTargetCompilerComboBox()->findText(mpSettings->value("simulation/targetCompiler").toString(), Qt::MatchExactly);
+    int currentIndex = mpSimulationPage->getTargetCompilerComboBox()->findData(mpSettings->value("simulation/targetCompiler"), Qt::UserRole, Qt::MatchExactly);
     if (currentIndex > -1) {
       mpSimulationPage->getTargetCompilerComboBox()->setCurrentIndex(currentIndex);
     }
   }
   if (mpSettings->contains("simulation/OMCFlags")) {
-    mpSimulationPage->getOMCFlagsTextBox()->setText(mpSettings->value("simulation/OMCFlags").toString());
+    mpSimulationPage->getOMCCommandLineOptionsTextBox()->setText(mpSettings->value("simulation/OMCFlags").toString());
   }
   if (mpSettings->contains("simulation/ignoreCommandLineOptionsAnnotation")) {
     mpSimulationPage->getIgnoreCommandLineOptionsAnnotationCheckBox()->setChecked(mpSettings->value("simulation/ignoreCommandLineOptionsAnnotation").toBool());
@@ -735,7 +774,7 @@ void OptionsDialog::readDebuggerSettings()
 void OptionsDialog::readFMISettings()
 {
   if (mpSettings->contains("FMIExport/Version")) {
-    mpFMIPage->setFMIExportVersion(mpSettings->value("FMIExport/Version").toDouble());
+    mpFMIPage->setFMIExportVersion(mpSettings->value("FMIExport/Version").toString());
   }
   if (mpSettings->contains("FMIExport/Type")) {
     mpFMIPage->setFMIExportType(mpSettings->value("FMIExport/Type").toString());
@@ -785,6 +824,28 @@ void OptionsDialog::readTLMSettings()
   // read TLM Monitor Process
   if (mpSettings->contains("TLM/MonitorProcess")) {
     mpTLMPage->getTLMMonitorProcessTextBox()->setText(mpSettings->value("TLM/MonitorProcess").toString());
+  }
+}
+
+/*!
+ * \brief OptionsDialog::readOMSimulatorSettings
+ * Reads the OMSimulator settings from omedit.ini
+ */
+void OptionsDialog::readOMSimulatorSettings()
+{
+  // read working directory
+  if (mpSettings->contains("OMSimulator/workingDirectory")) {
+    mpOMSimulatorPage->setWorkingDirectory(mpSettings->value("OMSimulator/workingDirectory").toString());
+    OMSProxy::instance()->setWorkingDirectory(mpSettings->value("OMSimulator/workingDirectory").toString());
+  }
+  // read logging level
+  int index;
+  if (mpSettings->contains("OMSimulator/loggingLevel")) {
+    index = mpOMSimulatorPage->getLoggingLevelComboBox()->findData(mpSettings->value("OMSimulator/loggingLevel").toInt());
+    if (index > -1) {
+      mpOMSimulatorPage->getLoggingLevelComboBox()->setCurrentIndex(index);
+      OMSProxy::instance()->setLoggingLevel(mpSettings->value("OMSimulator/loggingLevel").toInt());
+    }
   }
 }
 
@@ -845,6 +906,8 @@ void OptionsDialog::saveGeneralSettings()
   mpSettings->setValue("terminalCommandArgs", mpGeneralSettingsPage->getTerminalCommandArguments());
   // save hide variables browser
   mpSettings->setValue("hideVariablesBrowser", mpGeneralSettingsPage->getHideVariablesBrowserCheckBox()->isChecked());
+  // save activate access annotations
+  mpSettings->setValue("activateAccessAnnotations", mpGeneralSettingsPage->getActivateAccessAnnotationsCheckBox()->isChecked());
   // save library icon size
   mpSettings->setValue("libraryIconSize", mpGeneralSettingsPage->getLibraryIconSizeSpinBox()->value());
   // save show protected classes
@@ -988,6 +1051,19 @@ void OptionsDialog::saveCompositeModelEditorSettings()
 }
 
 /*!
+ * \brief OptionsDialog::saveOMSimulatorEditorSettings
+ * Saves the OMSimulatorEditor settings to omedit.ini
+ */
+void OptionsDialog::saveOMSimulatorEditorSettings()
+{
+  mpSettings->setValue("omsimulatorEditor/textRuleColor", mpOMSimulatorEditorPage->getColor("Text").rgba());
+  mpSettings->setValue("omsimulatorEditor/commentRuleColor", mpOMSimulatorEditorPage->getColor("Comment").rgba());
+  mpSettings->setValue("omsimulatorEditor/tagRuleColor", mpOMSimulatorEditorPage->getColor("Tag").rgba());
+  mpSettings->setValue("omsimulatorEditor/quotesRuleColor", mpOMSimulatorEditorPage->getColor("Quotes").rgba());
+  mpSettings->setValue("omsimulatorEditor/elementsRuleColor", mpOMSimulatorEditorPage->getColor("Element").rgba());
+}
+
+/*!
  * \brief OptionsDialog::saveCEditorSettings
  * Saves the CEditor settings to omedit.ini
  */
@@ -1049,13 +1125,14 @@ void OptionsDialog::saveSimulationSettings()
   mpSettings->setValue("simulation/targetLanguage", mpSimulationPage->getTargetLanguageComboBox()->currentText());
   MainWindow::instance()->getOMCProxy()->setCommandLineOptions(QString("+simCodeTarget=%1").arg(mpSimulationPage->getTargetLanguageComboBox()->currentText()));
   // save +target
-  mpSettings->setValue("simulation/targetCompiler", mpSimulationPage->getTargetCompilerComboBox()->currentText());
-  MainWindow::instance()->getOMCProxy()->setCommandLineOptions(QString("+target=%1").arg(mpSimulationPage->getTargetCompilerComboBox()->currentText()));
+  QString target = mpSimulationPage->getTargetCompilerComboBox()->itemData(mpSimulationPage->getTargetCompilerComboBox()->currentIndex()).toString();
+  mpSettings->setValue("simulation/targetCompiler", target);
+  MainWindow::instance()->getOMCProxy()->setCommandLineOptions(QString("+target=%1").arg(target));
   // save command line options ste manually by user. This will override above options.
-  if (MainWindow::instance()->getOMCProxy()->setCommandLineOptions(mpSimulationPage->getOMCFlagsTextBox()->text())) {
-    mpSettings->setValue("simulation/OMCFlags", mpSimulationPage->getOMCFlagsTextBox()->text());
+  if (MainWindow::instance()->getOMCProxy()->setCommandLineOptions(mpSimulationPage->getOMCCommandLineOptionsTextBox()->text())) {
+    mpSettings->setValue("simulation/OMCFlags", mpSimulationPage->getOMCCommandLineOptionsTextBox()->text());
   } else {
-    mpSimulationPage->getOMCFlagsTextBox()->setText(mpSettings->value("simulation/OMCFlags").toString());
+    mpSimulationPage->getOMCCommandLineOptionsTextBox()->setText(mpSettings->value("simulation/OMCFlags").toString());
   }
   // save ignore command line options
   mpSettings->setValue("simulation/ignoreCommandLineOptionsAnnotation", mpSimulationPage->getIgnoreCommandLineOptionsAnnotationCheckBox()->isChecked());
@@ -1229,6 +1306,20 @@ void OptionsDialog::saveTLMSettings()
 }
 
 /*!
+ * \brief OptionsDialog::saveOMSimulatorSettings
+ * Saves the OMSimulator settings in omedit.ini
+ */
+void OptionsDialog::saveOMSimulatorSettings()
+{
+  // set working directory
+  mpSettings->setValue("OMSimulator/workingDirectory", mpOMSimulatorPage->getWorkingDirectory());
+  OMSProxy::instance()->setWorkingDirectory(mpOMSimulatorPage->getWorkingDirectory());
+  // set logging level
+  mpSettings->setValue("OMSimulator/loggingLevel", mpOMSimulatorPage->getLoggingLevelComboBox()->itemData(mpOMSimulatorPage->getLoggingLevelComboBox()->currentIndex()).toInt());
+  OMSProxy::instance()->setLoggingLevel(mpOMSimulatorPage->getLoggingLevelComboBox()->itemData(mpOMSimulatorPage->getLoggingLevelComboBox()->currentIndex()).toInt());
+}
+
+/*!
  * \brief OptionsDialog::saveTraceabilitySettings
  * Saves the traceability settings in omedit.ini
  */
@@ -1322,6 +1413,10 @@ void OptionsDialog::addListItems()
   QListWidgetItem *pCompositeModelEditorItem = new QListWidgetItem(mpOptionsList);
   pCompositeModelEditorItem->setIcon(QIcon(":/Resources/icons/modeltext.svg"));
   pCompositeModelEditorItem->setText(tr("CompositeModel Editor"));
+  // OMSimulator Editor Item
+  QListWidgetItem *pOMSimulatorEditorItem = new QListWidgetItem(mpOptionsList);
+  pOMSimulatorEditorItem->setIcon(QIcon(":/Resources/icons/modeltext.svg"));
+  pOMSimulatorEditorItem->setText(tr("OMSimulator Editor"));
   // C/C++ Editor Item
   QListWidgetItem *pCEditorItem = new QListWidgetItem(mpOptionsList);
   pCEditorItem->setIcon(QIcon(":/Resources/icons/modeltext.svg"));
@@ -1374,6 +1469,10 @@ void OptionsDialog::addListItems()
   QListWidgetItem *pTLMItem = new QListWidgetItem(mpOptionsList);
   pTLMItem->setIcon(QIcon(":/Resources/icons/tlm-icon.svg"));
   pTLMItem->setText(tr("OMTLMSimulator"));
+  // OMSimulator Item
+  QListWidgetItem *pOMSimulatorItem = new QListWidgetItem(mpOptionsList);
+  pOMSimulatorItem->setIcon(QIcon(":/Resources/icons/tlm-icon.svg"));
+  pOMSimulatorItem->setText(tr("OMSimulator"));
   // Traceability Item
   QListWidgetItem *pTraceabilityItem = new QListWidgetItem(mpOptionsList);
   pTraceabilityItem->setIcon(QIcon(":/Resources/icons/traceability.svg"));
@@ -1391,6 +1490,7 @@ void OptionsDialog::createPages()
   mpPagesWidget->addWidget(mpModelicaEditorPage);
   mpPagesWidget->addWidget(mpMetaModelicaEditorPage);
   mpPagesWidget->addWidget(mpCompositeModelEditorPage);
+  mpPagesWidget->addWidget(mpOMSimulatorEditorPage);
   mpPagesWidget->addWidget(mpCEditorPage);
   mpPagesWidget->addWidget(mpHTMLEditorPage);
   mpPagesWidget->addWidget(mpGraphicalViewsPage);
@@ -1404,6 +1504,7 @@ void OptionsDialog::createPages()
   mpPagesWidget->addWidget(mpDebuggerPage);
   mpPagesWidget->addWidget(mpFMIPage);
   mpPagesWidget->addWidget(mpTLMPage);
+  mpPagesWidget->addWidget(mpOMSimulatorPage);
   mpPagesWidget->addWidget(mpTraceabilityPage);
 }
 
@@ -1483,6 +1584,8 @@ void OptionsDialog::saveSettings()
   emit metaModelicaEditorSettingsChanged();
   saveCompositeModelEditorSettings();
   emit compositeModelEditorSettingsChanged();
+  saveOMSimulatorEditorSettings();
+  emit omsimulatorEditorSettingsChanged();
   saveCEditorSettings();
   emit cEditorSettingsChanged();
   saveHTMLEditorSettings();
@@ -1498,6 +1601,7 @@ void OptionsDialog::saveSettings()
   saveDebuggerSettings();
   saveFMISettings();
   saveTLMSettings();
+  saveOMSimulatorSettings();
   saveTraceabilitySettings();
   // emit the signal so that all text editors can set settings & line wrapping mode
   emit textSettingsChanged();
@@ -1572,6 +1676,10 @@ GeneralSettingsPage::GeneralSettingsPage(OptionsDialog *pOptionsDialog)
   mpHideVariablesBrowserCheckBox = new QCheckBox(tr("Hide Variables Browser"));
   mpHideVariablesBrowserCheckBox->setToolTip(tr("Hides the variable browser when switching away from plotting perspective."));
   mpHideVariablesBrowserCheckBox->setChecked(true);
+  // activate access annotation
+  mpActivateAccessAnnotationsCheckBox = new QCheckBox(tr("Activate Access Annotations *"));
+  mpActivateAccessAnnotationsCheckBox->setToolTip(tr("Activates the access annotations for the non-encrypted libraries. "
+                                                     "Access annotations are always active for encrypted libraries."));
   // set the layout of general settings group
   QGridLayout *generalSettingsLayout = new QGridLayout;
   generalSettingsLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -1589,6 +1697,7 @@ GeneralSettingsPage::GeneralSettingsPage(OptionsDialog *pOptionsDialog)
   generalSettingsLayout->addWidget(mpTerminalCommandArgumentsLabel, 5, 0);
   generalSettingsLayout->addWidget(mpTerminalCommandArgumentsTextBox, 5, 1, 1, 2);
   generalSettingsLayout->addWidget(mpHideVariablesBrowserCheckBox, 6, 0, 1, 3);
+  generalSettingsLayout->addWidget(mpActivateAccessAnnotationsCheckBox, 7, 0, 1, 3);
   mpGeneralSettingsGroupBox->setLayout(generalSettingsLayout);
   // Libraries Browser group box
   mpLibrariesBrowserGroupBox = new QGroupBox(tr("Libraries Browser"));
@@ -2682,6 +2791,109 @@ void CompositeModelEditorPage::setLineWrapping(bool enabled)
 }
 
 /*!
+ * \class OMSimulatorEditorPage
+ * \brief Creates an interface for OMS CompositeModel Text settings.
+ */
+/*!
+ * \brief OMSimulatorEditorPage::OMSimulatorEditorPage
+ * \param pOptionsDialog is the pointer to OptionsDialog
+ */
+OMSimulatorEditorPage::OMSimulatorEditorPage(OptionsDialog *pOptionsDialog)
+  : QWidget(pOptionsDialog)
+{
+  mpOptionsDialog = pOptionsDialog;
+  // code colors widget
+  mpCodeColorsWidget = new CodeColorsWidget(this);
+  connect(mpCodeColorsWidget, SIGNAL(colorUpdated()), SIGNAL(updatePreview()));
+  // Add items to list
+  // tag (blue)
+  new ListWidgetItem("Tag", QColor(0, 0, 255), mpCodeColorsWidget->getItemsListWidget());
+  // element (blue)
+  new ListWidgetItem("Element", QColor(0, 0, 255), mpCodeColorsWidget->getItemsListWidget());
+  // quotes (dark red)
+  new ListWidgetItem("Quotes", QColor(139, 0, 0), mpCodeColorsWidget->getItemsListWidget());
+  // comment (dark green)
+  new ListWidgetItem("Comment", QColor(0, 150, 0), mpCodeColorsWidget->getItemsListWidget());
+  // preview textbox
+  QString previewText;
+  previewText.append("<!-- This is a comment. -->\n"
+                     "<ssd:SystemStructureDescription name=\"model\">"
+                     "\t<ssd:System name=\"model\">\n"
+                     "\t\t<ssd:Component name=\"adder1\" type=\"application/x-fmu-sharedlibrary\" source=\"FMUs/adder.fmu\">\n"
+                     "\t\t\t<ssd:ElementGeometry x1=\"40\" y1=\"20\" x2=\"60\" y2=\"40\" rotation=\"0\" iconRotation=\"0\" iconFlip=\"false\" iconFixedAspectRatio=\"false\" />\n"
+                     "\t\t\t<ssd:Connectors />\n"
+                     "\t\t</ssd:Component>\n"
+                     "\t\t<ssd:Connections />\n"
+                     "\t</ssd:System>\n"
+                     "\t<ssd:DefaultExperiment startTime=\"0\" stopTime=\"5\" />\n"
+                     "</ssd:SystemStructureDescription>");
+  mpCodeColorsWidget->getPreviewPlainTextEdit()->setPlainText(previewText);
+  // highlight preview textbox
+  OMSimulatorHighlighter *pOMSimulatorHighlighter = new OMSimulatorHighlighter(this, mpCodeColorsWidget->getPreviewPlainTextEdit());
+  connect(this, SIGNAL(updatePreview()), pOMSimulatorHighlighter, SLOT(settingsChanged()));
+  connect(mpOptionsDialog->getTextEditorPage()->getSyntaxHighlightingGroupBox(), SIGNAL(toggled(bool)),
+          pOMSimulatorHighlighter, SLOT(settingsChanged()));
+  connect(mpOptionsDialog->getTextEditorPage()->getMatchParenthesesCommentsQuotesCheckBox(), SIGNAL(toggled(bool)),
+          pOMSimulatorHighlighter, SLOT(settingsChanged()));
+  connect(mpOptionsDialog->getTextEditorPage()->getLineWrappingCheckbox(), SIGNAL(toggled(bool)), this, SLOT(setLineWrapping(bool)));
+  // set the layout
+  QVBoxLayout *pMainLayout = new QVBoxLayout;
+  pMainLayout->setContentsMargins(0, 0, 0, 0);
+  pMainLayout->addWidget(mpCodeColorsWidget);
+  setLayout(pMainLayout);
+}
+
+/*!
+ * \brief OMSimulatorEditorPage::setColor
+ * Sets the color of an item.
+ * \param item
+ * \param color
+ */
+void OMSimulatorEditorPage::setColor(QString item, QColor color)
+{
+  QList<QListWidgetItem*> items = mpCodeColorsWidget->getItemsListWidget()->findItems(item, Qt::MatchExactly);
+  if (items.size() > 0) {
+    ListWidgetItem *pListWidgetItem = dynamic_cast<ListWidgetItem*>(items.at(0));
+    if (pListWidgetItem) {
+      pListWidgetItem->setColor(color);
+      pListWidgetItem->setForeground(color);
+    }
+  }
+}
+
+/*!
+ * \brief OMSimulatorEditorPage::getColor
+ * Returns the color of an item.
+ * \param item
+ * \return
+ */
+QColor OMSimulatorEditorPage::getColor(QString item)
+{
+  QList<QListWidgetItem*> items = mpCodeColorsWidget->getItemsListWidget()->findItems(item, Qt::MatchExactly);
+  if (items.size() > 0) {
+    ListWidgetItem *pListWidgetItem = dynamic_cast<ListWidgetItem*>(items.at(0));
+    if (pListWidgetItem) {
+      return pListWidgetItem->getColor();
+    }
+  }
+  return QColor(0, 0, 0);
+}
+
+/*!
+ * \brief OMSimulatorEditorPage::setLineWrapping
+ * Slot activated when mpLineWrappingCheckbox toggled SIGNAL is raised.
+ * Sets the mpPreviewPlainTextBox line wrapping mode.
+ */
+void OMSimulatorEditorPage::setLineWrapping(bool enabled)
+{
+  if (enabled) {
+    mpCodeColorsWidget->getPreviewPlainTextEdit()->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+  } else {
+    mpCodeColorsWidget->getPreviewPlainTextEdit()->setLineWrapMode(QPlainTextEdit::NoWrap);
+  }
+}
+
+/*!
  * \class CEditorPage
  * \brief Creates an interface for C Text settings.
  */
@@ -3273,23 +3485,28 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   mpTargetLanguageComboBox->setCurrentIndex(mpTargetLanguageComboBox->findText("C"));
   // Compiler
   mpCompilerLabel = new Label(tr("Target Compiler:"));
-  OMCInterface::getConfigFlagValidOptions_res target = MainWindow::instance()->getOMCProxy()->getConfigFlagValidOptions("target");
   mpTargetCompilerComboBox = new QComboBox;
-  mpTargetCompilerComboBox->addItems(target.validOptions);
-  mpTargetCompilerComboBox->setToolTip(target.mainDescription);
-  i = 0;
-  foreach (QString description, target.descriptions) {
-    mpTargetCompilerComboBox->setItemData(i, description, Qt::ToolTipRole);
-    i++;
-  }
-  // OMC Flags
-  mpOMCFlagsLabel = new Label(QString("%1:").arg(Helper::OMCFlags));
-  mpOMCFlagsLabel->setToolTip(Helper::OMCFlagsTip);
-  mpOMCFlagsTextBox = new QLineEdit("-d=initialization");
-  mpOMCFlagsHelpButton = new QToolButton;
-  mpOMCFlagsHelpButton->setIcon(QIcon(":/Resources/icons/link-external.svg"));
-  mpOMCFlagsHelpButton->setToolTip(tr("OMC flags help"));
-  connect(mpOMCFlagsHelpButton, SIGNAL(clicked()), SLOT(showOMCFlagsHelp()));
+#ifdef Q_OS_WIN
+  mpTargetCompilerComboBox->addItem("MinGW GCC (gcc)", "gcc");
+  mpTargetCompilerComboBox->addItem("Visual Studio (msvc)", "msvc");
+  mpTargetCompilerComboBox->addItem("Visual Studio 2010 (msvc10)", "msvc10");
+  mpTargetCompilerComboBox->addItem("Visual Studio 2012 (msvc12)", "msvc12");
+  mpTargetCompilerComboBox->addItem("Visual Studio 2013 (msvc13)", "msvc13");
+  mpTargetCompilerComboBox->addItem("Visual Studio 2015 (msvc15)", "msvc15");
+#else
+  mpTargetCompilerComboBox->addItem("GCC", "gcc");
+  mpTargetCompilerComboBox->addItem("Clang", "clang");
+#endif
+  mpTargetCompilerComboBox->addItem("vxworks69", "vxworks69");
+  mpTargetCompilerComboBox->addItem("debugrt", "debugrt");
+  // OMC CommandLineOptions
+  mpOMCCommandLineOptionsLabel = new Label(QString("%1:").arg(Helper::OMCCommandLineOptions));
+  mpOMCCommandLineOptionsLabel->setToolTip(Helper::OMCCommandLineOptionsTip);
+  mpOMCCommandLineOptionsTextBox = new QLineEdit("-d=initialization");
+  mpOMCCommandLineOptionsHelpButton = new QToolButton;
+  mpOMCCommandLineOptionsHelpButton->setIcon(QIcon(":/Resources/icons/link-external.svg"));
+  mpOMCCommandLineOptionsHelpButton->setToolTip(tr("OMC command line options help"));
+  connect(mpOMCCommandLineOptionsHelpButton, SIGNAL(clicked()), SLOT(showOMCCommandLineOptionsHelp()));
   // ignore command line options annotation checkbox
   mpIgnoreCommandLineOptionsAnnotationCheckBox = new QCheckBox(tr("Ignore __OpenModelica_commandLineOptions annotation"));
   // ignore simulation flags annotation checkbox
@@ -3339,9 +3556,9 @@ SimulationPage::SimulationPage(OptionsDialog *pOptionsDialog)
   pSimulationLayout->addWidget(mpTargetLanguageComboBox, 2, 1, 1, 2);
   pSimulationLayout->addWidget(mpCompilerLabel, 3, 0);
   pSimulationLayout->addWidget(mpTargetCompilerComboBox, 3, 1, 1, 2);
-  pSimulationLayout->addWidget(mpOMCFlagsLabel, 4, 0);
-  pSimulationLayout->addWidget(mpOMCFlagsTextBox, 4, 1);
-  pSimulationLayout->addWidget(mpOMCFlagsHelpButton, 4, 2);
+  pSimulationLayout->addWidget(mpOMCCommandLineOptionsLabel, 4, 0);
+  pSimulationLayout->addWidget(mpOMCCommandLineOptionsTextBox, 4, 1);
+  pSimulationLayout->addWidget(mpOMCCommandLineOptionsHelpButton, 4, 2);
   pSimulationLayout->addWidget(mpIgnoreCommandLineOptionsAnnotationCheckBox, 5, 0, 1, 3);
   pSimulationLayout->addWidget(mpIgnoreSimulationFlagsAnnotationCheckBox, 6, 0, 1, 3);
   pSimulationLayout->addWidget(mpSaveClassBeforeSimulationCheckBox, 7, 0, 1, 3);
@@ -3398,11 +3615,11 @@ void SimulationPage::updateIndexReductionToolTip(int index)
 }
 
 /*!
- * \brief SimulationPage::showOMCFlagsHelp
- * Slot activated when mpOMCFlagsHelpButton clicked signal is raised.\n
+ * \brief SimulationPage::showOMCCommandLineOptionsHelp
+ * Slot activated when mpOMCCommandLineOptionsHelpButton clicked signal is raised.\n
  * Opens the omchelptext.html page of OpenModelica users guide.
  */
-void SimulationPage::showOMCFlagsHelp()
+void SimulationPage::showOMCCommandLineOptionsHelp()
 {
   QUrl omcHelpTextPath (QString("file:///").append(QString(Helper::OpenModelicaHome).replace("\\", "/"))
                         .append("/share/doc/omc/OpenModelicaUsersGuide/omchelptext.html"));
@@ -4299,9 +4516,9 @@ FMIPage::FMIPage(OptionsDialog *pOptionsDialog)
  * Sets the FMI export version
  * \param version
  */
-void FMIPage::setFMIExportVersion(double version)
+void FMIPage::setFMIExportVersion(QString version)
 {
-  if (version == 1.0) {
+  if (version == "1.0" || version == "1") {
     mpVersion1RadioButton->setChecked(true);
   } else {
     mpVersion2RadioButton->setChecked(true);
@@ -4313,12 +4530,12 @@ void FMIPage::setFMIExportVersion(double version)
  * Gets the FMI export version
  * \return
  */
-double FMIPage::getFMIExportVersion()
+QString FMIPage::getFMIExportVersion()
 {
   if (mpVersion1RadioButton->isChecked()) {
-    return 1.0;
+    return "1.0";
   } else {
-    return 2.0;
+    return "2.0";
   }
 }
 
@@ -4490,6 +4707,58 @@ void TLMPage::browseTLMMonitorProcess()
 {
   mpTLMMonitorProcessTextBox->setText(StringHandler::getOpenFileName(this, QString(Helper::applicationName).append(" - ").append(Helper::chooseFile),
                                                                      NULL, Helper::exeFileTypes, NULL));
+}
+
+/*!
+ * \class OMSimulatorPage
+ * Creates an interface for OMSimulator settings.
+ */
+/*!
+ * \brief OMSimulatorPage::OMSimulatorPage
+ * \param pOptionsDialog
+ */
+OMSimulatorPage::OMSimulatorPage(OptionsDialog *pOptionsDialog)
+  : QWidget(pOptionsDialog)
+{
+  mpOptionsDialog = pOptionsDialog;
+  mpGeneralGroupBox = new QGroupBox(Helper::general);
+  // working directory
+  mpWorkingDirectoryLabel = new Label(Helper::workingDirectory);
+  mpWorkingDirectoryTextBox = new QLineEdit(Utilities::tempDirectory());
+  mpBrowseWorkingDirectoryButton = new QPushButton(Helper::browse);
+  mpBrowseWorkingDirectoryButton->setAutoDefault(false);
+  connect(mpBrowseWorkingDirectoryButton, SIGNAL(clicked()), SLOT(browseWorkingDirectory()));
+  // logging level
+  mpLoggingLevelLabel = new Label(tr("Logging Level:"));
+  mpLoggingLevelComboBox = new QComboBox;
+  mpLoggingLevelComboBox->addItem("default", QVariant(0));
+  mpLoggingLevelComboBox->addItem("default+debug", QVariant(1));
+  mpLoggingLevelComboBox->addItem("default+debug+trace", QVariant(2));
+  // set the layout
+  QGridLayout *pGeneralGroupBoxLayout = new QGridLayout;
+  pGeneralGroupBoxLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  pGeneralGroupBoxLayout->addWidget(mpWorkingDirectoryLabel, 0, 0);
+  pGeneralGroupBoxLayout->addWidget(mpWorkingDirectoryTextBox, 0, 1);
+  pGeneralGroupBoxLayout->addWidget(mpBrowseWorkingDirectoryButton, 0, 2);
+  pGeneralGroupBoxLayout->addWidget(mpLoggingLevelLabel, 1, 0);
+  pGeneralGroupBoxLayout->addWidget(mpLoggingLevelComboBox, 1, 1, 1, 2);
+  mpGeneralGroupBox->setLayout(pGeneralGroupBoxLayout);
+  QVBoxLayout *pMainLayout = new QVBoxLayout;
+  pMainLayout->setAlignment(Qt::AlignTop);
+  pMainLayout->setContentsMargins(0, 0, 0, 0);
+  pMainLayout->addWidget(mpGeneralGroupBox);
+  setLayout(pMainLayout);
+}
+
+/*!
+ * \brief OMSimulatorPage::browseWorkingDirectory
+ * Slot activated when mpBrowseWorkingDirectoryButton clicked signal is raised.
+ * Allows user to choose a new working directory.
+ */
+void OMSimulatorPage::browseWorkingDirectory()
+{
+  mpWorkingDirectoryTextBox->setText(StringHandler::getExistingDirectory(this, QString("%1 - %2").arg(Helper::applicationName)
+                                                                         .arg(Helper::chooseDirectory), NULL));
 }
 
 /*!

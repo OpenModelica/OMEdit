@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -32,14 +32,16 @@
  * @author Adeel Asghar <adeel.asghar@liu.se>
  */
 
-
 #include "MainWindow.h"
 /* Keep PlotWindowContainer on top to include OSG first */
 #include "Plotting/PlotWindowContainer.h"
+#include "Modeling/ModelWidgetContainer.h"
 #include "Options/OptionsDialog.h"
 #include "Modeling/MessagesWidget.h"
+#include "OMS/OMSProxy.h"
 #include "Modeling/LibraryTreeWidget.h"
 #include "Modeling/ModelicaClassDialog.h"
+#include "OMS/ModelDialog.h"
 #include "Debugger/GDB/GDBAdapter.h"
 #include "Debugger/StackFrames/StackFramesWidget.h"
 #include "Debugger/Locals/LocalsWidget.h"
@@ -54,6 +56,7 @@
 #include "Simulation/SimulationOutputWidget.h"
 #include "TLM/FetchInterfaceDataDialog.h"
 #include "TLM/TLMCoSimulationOutputWidget.h"
+#include "OMS/OMSSimulationDialog.h"
 #include "Debugger/DebuggerConfigurationsDialog.h"
 #include "Debugger/Attach/AttachToProcessDialog.h"
 #include "TransformationalDebugger/TransformationsWidget.h"
@@ -61,6 +64,7 @@
 #include "Simulation/SimulationDialog.h"
 #include "TLM/TLMCoSimulationDialog.h"
 #include "FMI/ImportFMUDialog.h"
+#include "OMS/InstantiateDialog.h"
 #include "FMI/ImportFMUModelDescriptionDialog.h"
 #include "Git/CommitChangesDialog.h"
 #include "Git/RevertCommitsDialog.h"
@@ -68,6 +72,7 @@
 #include "Git/GitCommands.h"
 #include "Traceability/TraceabilityInformationURI.h"
 #include "Traceability/TraceabilityGraphViewWidget.h"
+#include "Plotting/DiagramWindow.h"
 #include "omc_config.h"
 
 #include <QtSvg/QSvgGenerator>
@@ -148,6 +153,10 @@ void MainWindow::setUpMainWindow(threadData_t *threadData)
     return;
   }
   SplashScreen::instance()->showMessage(tr("Reading Settings"), Qt::AlignRight, Qt::white);
+  // Get the number of processors.
+  mNumberOfProcessors = mpOMCProxy->numProcessors();
+  // create an object of OMSProxy
+  OMSProxy::create();
   // Create an object of OptionsDialog
   OptionsDialog::create();
   SplashScreen::instance()->showMessage(tr("Loading Widgets"), Qt::AlignRight, Qt::white);
@@ -310,6 +319,8 @@ void MainWindow::setUpMainWindow(threadData_t *threadData)
   mpSimulationDialog = 0;
   // Create TLM co-simulation dialog when needed
   mpTLMCoSimulationDialog = 0;
+  // Create the OMSimulator simulation dialog when needed
+  mpOMSSimulationDialog = 0;
   // Create an object of ModelWidgetContainer
   mpModelWidgetContainer = new ModelWidgetContainer(this);
   // Create an object of WelcomePageWidget
@@ -338,15 +349,16 @@ void MainWindow::setUpMainWindow(threadData_t *threadData)
   mpOMCProxy->setMatchingAlgorithm(OptionsDialog::instance()->getSimulationPage()->getMatchingAlgorithmComboBox()->currentText());
   // set the index reduction methods.
   mpOMCProxy->setIndexReductionMethod(OptionsDialog::instance()->getSimulationPage()->getIndexReductionMethodComboBox()->currentText());
-  // set the OMC Flags.
-  if (!OptionsDialog::instance()->getSimulationPage()->getOMCFlagsTextBox()->text().isEmpty()) {
-    mpOMCProxy->setCommandLineOptions(OptionsDialog::instance()->getSimulationPage()->getOMCFlagsTextBox()->text());
+  // set the OMC CommandLineOptions.
+  if (!OptionsDialog::instance()->getSimulationPage()->getOMCCommandLineOptionsTextBox()->text().isEmpty()) {
+    mpOMCProxy->setCommandLineOptions(OptionsDialog::instance()->getSimulationPage()->getOMCCommandLineOptionsTextBox()->text());
   }
   if (OptionsDialog::instance()->getDebuggerPage()->getGenerateOperationsCheckBox()->isChecked()) {
     mpOMCProxy->setCommandLineOptions("-d=infoXmlOperations");
   }
   mpOMCProxy->setCommandLineOptions(QString("--simCodeTarget=%1").arg(OptionsDialog::instance()->getSimulationPage()->getTargetLanguageComboBox()->currentText()));
-  mpOMCProxy->setCommandLineOptions(QString("--target=%1").arg(OptionsDialog::instance()->getSimulationPage()->getTargetCompilerComboBox()->currentText()));
+  QString target = OptionsDialog::instance()->getSimulationPage()->getTargetCompilerComboBox()->itemData(OptionsDialog::instance()->getSimulationPage()->getTargetCompilerComboBox()->currentIndex()).toString();
+  mpOMCProxy->setCommandLineOptions(QString("--target=%1").arg(target));
   if (OptionsDialog::instance()->getSimulationPage()->getIgnoreCommandLineOptionsAnnotationCheckBox()->isChecked()) {
     mpOMCProxy->setCommandLineOptions("--ignoreCommandLineOptionsAnnotation=true");
   }
@@ -357,7 +369,7 @@ void MainWindow::setUpMainWindow(threadData_t *threadData)
   QSettings *pSettings = Utilities::getApplicationSettings();
   if (OptionsDialog::instance()->getGeneralSettingsPage()->getPreserveUserCustomizations()) {
     restoreGeometry(pSettings->value("application/geometry").toByteArray());
-    bool restoreMessagesWidget = !MessagesWidget::instance()->getMessagesTextBrowser()->toPlainText().isEmpty();
+    bool restoreMessagesWidget = !MessagesWidget::instance()->getAllMessageWidget()->getMessagesTextBrowser()->toPlainText().isEmpty();
     restoreState(pSettings->value("application/windowState").toByteArray());
     pSettings->beginGroup("algorithmicDebugger");
     /* restore stackframes list and locals columns width */
@@ -519,12 +531,25 @@ void MainWindow::beforeClosingMainWindow()
 {
   mpOMCProxy->quitOMC();
   delete mpOMCProxy;
+  // Unload the OMSimulator models
+  LibraryTreeItem* pLibraryTreeItem = mpLibraryWidget->getLibraryTreeModel()->getRootLibraryTreeItem();
+  for (int i = 0; i < pLibraryTreeItem->childrenSize(); i++) {
+    LibraryTreeItem *pChildLibraryTreeItem = pLibraryTreeItem->child(i);
+    if (pChildLibraryTreeItem && pChildLibraryTreeItem->getLibraryType() == LibraryTreeItem::OMS) {
+      mpLibraryWidget->getLibraryTreeModel()->unloadOMSModel(pChildLibraryTreeItem, false);
+    }
+  }
+  // delete the OMSProxy object
+  OMSProxy::destroy();
   delete mpModelWidgetContainer;
   if (mpSimulationDialog) {
     delete mpSimulationDialog;
   }
   if (mpTLMCoSimulationDialog) {
     delete mpTLMCoSimulationDialog;
+  }
+  if (mpOMSSimulationDialog) {
+    delete mpOMSSimulationDialog;
   }
   /* save the TransformationsWidget last window geometry and splitters state. */
   QSettings *pSettings = Utilities::getApplicationSettings();
@@ -710,6 +735,45 @@ void MainWindow::simulationSetup(LibraryTreeItem *pLibraryTreeItem)
   mpSimulationDialog->show(pLibraryTreeItem, false, SimulationOptions());
 }
 
+/*!
+ * \brief MainWindow::instantiateOMSModel
+ * Instantiates the OMSimulator model.
+ * \param pLibraryTreeItem
+ * \param checked
+ */
+void MainWindow::instantiateOMSModel(LibraryTreeItem *pLibraryTreeItem, bool checked)
+{
+  if (checked) {
+    InstantiateDialog *pInstantiateDialog = new InstantiateDialog(pLibraryTreeItem);
+    // if user cancels the instantiation
+    if (!pInstantiateDialog->exec()) {
+      mpOMSInstantiateModelAction->setChecked(false);
+    }
+  } else {
+    if (!OMSProxy::instance()->terminate(pLibraryTreeItem->getNameStructure())) {
+      mpOMSInstantiateModelAction->setChecked(true);
+    } else {
+      mpOMSInstantiateModelAction->setText(Helper::instantiateModel);
+      mpOMSInstantiateModelAction->setText(Helper::instantiateOMSModelTip);
+      mpOMSSimulateAction->setEnabled(false);
+      pLibraryTreeItem->setModelState(oms_modelState_terminated);
+    }
+  }
+}
+
+/*!
+ * \brief MainWindow::simulateOMSModel
+ * Simulates the OMSimulator model.
+ * \param pLibraryTreeItem
+ */
+void MainWindow::simulateOMSModel(LibraryTreeItem *pLibraryTreeItem)
+{
+  if (!mpOMSSimulationDialog) {
+    mpOMSSimulationDialog = new OMSSimulationDialog(this);
+  }
+  mpOMSSimulationDialog->simulate(pLibraryTreeItem);
+}
+
 void MainWindow::instantiateModel(LibraryTreeItem *pLibraryTreeItem)
 {
   /* if Modelica text is changed manually by user then validate it before saving. */
@@ -828,14 +892,25 @@ void MainWindow::exportModelFMU(LibraryTreeItem *pLibraryTreeItem)
   // set the folder as working directory
   MainWindow::instance()->getOMCProxy()->changeDirectory(modelDirectoryPath);
   // buildModelFMU parameters
-  double version = OptionsDialog::instance()->getFMIPage()->getFMIExportVersion();
+  QString version = OptionsDialog::instance()->getFMIPage()->getFMIExportVersion();
   QString type = OptionsDialog::instance()->getFMIPage()->getFMIExportType();
   QString FMUName = OptionsDialog::instance()->getFMIPage()->getFMUNameTextBox()->text();
   QSettings *pSettings = Utilities::getApplicationSettings();
-  QList<QString> platforms = pSettings->value("FMIExport/Platforms").toStringList();
+  QList<QString> platforms;
+  if (!pSettings->contains("FMIExport/Platforms")) {
+    QComboBox *pLinkingComboBox = OptionsDialog::instance()->getFMIPage()->getLinkingComboBox();
+    platforms.append(pLinkingComboBox->itemData(pLinkingComboBox->currentIndex()).toString());
+  } else {
+    platforms = pSettings->value("FMIExport/Platforms").toStringList();
+  }
   int index = platforms.indexOf("none");
   if (index > -1) {
     platforms.removeAt(index);
+  }
+  if (platforms.empty()) {
+    MessagesWidget::instance()->addGUIMessage(MessageItem(MessageItem::Modelica, "", false, 0, 0, 0, 0,
+                                                          GUIMessages::getMessage(GUIMessages::FMU_EMPTY_PLATFORMS).arg(Helper::toolsOptionsPath),
+                                                          Helper::scriptingKind, Helper::warningLevel));
   }
   QString fmuFileName = mpOMCProxy->buildModelFMU(pLibraryTreeItem->getNameStructure(), version, type, FMUName, platforms);
   if (!fmuFileName.isEmpty()) {
@@ -1474,6 +1549,55 @@ void MainWindow::openCompositeModelFile()
 }
 
 /*!
+ * \brief MainWindow::createNewOMSModel
+ * Create a new OMSimulator model.
+ */
+void MainWindow::createNewOMSModel()
+{
+  CreateModelDialog *pCreateModelDialog = new CreateModelDialog;
+  pCreateModelDialog->exec();
+}
+
+/*!
+ * \brief MainWindow::openOMSModelFile
+ * Opens the OMSimulator model file(s).\n
+ * Slot activated when mpOpenOMSModelFileAction triggered signal is raised.
+ */
+void MainWindow::openOMSModelFile()
+{
+  QStringList fileNames;
+  fileNames = StringHandler::getOpenFileNames(this, QString(Helper::applicationName).append(" - ").append(Helper::chooseFiles), NULL,
+                                              Helper::omsFileTypes, NULL);
+  if (fileNames.isEmpty()) {
+    return;
+  }
+  int progressValue = 0;
+  mpProgressBar->setRange(0, fileNames.size());
+  showProgressBar();
+  foreach (QString file, fileNames) {
+    file = file.replace("\\", "/");
+    mpStatusBar->showMessage(QString(Helper::loading).append(": ").append(file));
+    mpProgressBar->setValue(++progressValue);
+    // if file doesn't exists
+    if (!QFile::exists(file)) {
+      QMessageBox *pMessageBox = new QMessageBox(this);
+      pMessageBox->setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::error));
+      pMessageBox->setIcon(QMessageBox::Critical);
+      pMessageBox->setAttribute(Qt::WA_DeleteOnClose);
+      pMessageBox->setText(QString(GUIMessages::getMessage(GUIMessages::UNABLE_TO_LOAD_FILE).arg(file)));
+      pMessageBox->setInformativeText(QString(GUIMessages::getMessage(GUIMessages::FILE_NOT_FOUND).arg(file)));
+      pMessageBox->setStandardButtons(QMessageBox::Ok);
+      pMessageBox->exec();
+    } else {
+      mpLibraryWidget->openFile(file, Helper::utf8);
+    }
+  }
+  mpStatusBar->clearMessage();
+  hideProgressBar();
+
+}
+
+/*!
  * \brief MainWindow::loadExternalModels
  * Loads the external model(s) for TLM meta-modeling.\n
  * Slot activated when mpLoadExternModelAction triggered signal is raised.
@@ -1616,29 +1740,10 @@ void MainWindow::undo()
     pModelWidget->clearSelection();
     pModelWidget->getUndoStack()->undo();
     pModelWidget->updateClassAnnotationIfNeeded();
-    pModelWidget->updateModelText(false);
-  }
-  if (pModelWidget && pModelWidget->getEditor() && (pModelWidget->getEditor()->getPlainTextEdit()->document()->isUndoAvailable())) {
-    if (pModelWidget &&
-        ((pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) ||
-         (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()))) {
-      pModelWidget->getEditor()->setForceSetPlainText(true);
-    }
+    pModelWidget->updateModelText();
+  } else if (pModelWidget && pModelWidget->getEditor() && pModelWidget->getEditor()->isVisible()
+             && pModelWidget->getEditor()->getPlainTextEdit()->document()->isUndoAvailable()) {
     pModelWidget->getEditor()->getPlainTextEdit()->document()->undo();
-//    if (pModelWidget->getEditor()->isVisible() &&
-//        pModelWidget->getEditor()->getPlainTextEdit()->document()->availableUndoSteps() + 1 == pModelWidget->getUndoStack()->index()) {
-//      pModelWidget->clearSelection();
-//      pModelWidget->getUndoStack()->undo();
-//      pModelWidget->updateClassAnnotationIfNeeded();
-//    } else {
-//      pModelWidget->getEditor()->setTextChanged(true);
-//    }
-//    pModelWidget->updateModelText(false);
-    if (pModelWidget &&
-        ((pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) ||
-         (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()))) {
-      pModelWidget->getEditor()->setForceSetPlainText(false);
-    }
   }
 }
 
@@ -1655,29 +1760,10 @@ void MainWindow::redo()
     pModelWidget->clearSelection();
     pModelWidget->getUndoStack()->redo();
     pModelWidget->updateClassAnnotationIfNeeded();
-    pModelWidget->updateModelText(false);
-  }
-  if (pModelWidget && pModelWidget->getEditor() && (pModelWidget->getEditor()->getPlainTextEdit()->document()->isRedoAvailable())) {
-    if (pModelWidget &&
-        ((pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) ||
-         (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()))) {
-      pModelWidget->getEditor()->setForceSetPlainText(true);
-    }
+    pModelWidget->updateModelText();
+  } else if (pModelWidget && pModelWidget->getEditor() && pModelWidget->getEditor()->isVisible()
+             && pModelWidget->getEditor()->getPlainTextEdit()->document()->isRedoAvailable()) {
     pModelWidget->getEditor()->getPlainTextEdit()->document()->redo();
-//    if (pModelWidget->getEditor()->isVisible() &&
-//        pModelWidget->getEditor()->getPlainTextEdit()->document()->availableRedoSteps() == pModelWidget->getUndoStack()->index()) {
-//      pModelWidget->clearSelection();
-//      pModelWidget->getUndoStack()->redo();
-//      pModelWidget->updateClassAnnotationIfNeeded();
-//    } else {
-//      pModelWidget->getEditor()->setTextChanged(true);
-//    }
-//    pModelWidget->updateModelText(false);
-    if (pModelWidget &&
-        ((pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) ||
-         (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()))) {
-      pModelWidget->getEditor()->setForceSetPlainText(false);
-    }
   }
 }
 
@@ -1711,11 +1797,11 @@ void MainWindow::resetZoom()
 {
   ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
   if (pModelWidget) {
-    if (pModelWidget->getDiagramGraphicsView()->isVisible()) {
+    if (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()) {
       pModelWidget->getDiagramGraphicsView()->resetZoom();
-    } else if (pModelWidget->getIconGraphicsView()->isVisible()) {
+    } else if (pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) {
       pModelWidget->getIconGraphicsView()->resetZoom();
-    } else if (pModelWidget->getEditor()->isVisible()) {
+    } else if (pModelWidget->getEditor() && pModelWidget->getEditor()->isVisible()) {
       pModelWidget->getEditor()->getPlainTextEdit()->resetZoom();
     }
   }
@@ -1731,11 +1817,11 @@ void MainWindow::zoomIn()
 {
   ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
   if (pModelWidget) {
-    if (pModelWidget->getDiagramGraphicsView()->isVisible()) {
+    if (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()) {
       pModelWidget->getDiagramGraphicsView()->zoomIn();
-    } else if (pModelWidget->getIconGraphicsView()->isVisible()) {
+    } else if (pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) {
       pModelWidget->getIconGraphicsView()->zoomIn();
-    } else if (pModelWidget->getEditor()->isVisible()) {
+    } else if (pModelWidget->getEditor() && pModelWidget->getEditor()->isVisible()) {
       pModelWidget->getEditor()->getPlainTextEdit()->zoomIn();
     }
   }
@@ -1751,11 +1837,11 @@ void MainWindow::zoomOut()
 {
   ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
   if (pModelWidget) {
-    if (pModelWidget->getDiagramGraphicsView()->isVisible()) {
+    if (pModelWidget->getDiagramGraphicsView() && pModelWidget->getDiagramGraphicsView()->isVisible()) {
       pModelWidget->getDiagramGraphicsView()->zoomOut();
-    } else if (pModelWidget->getIconGraphicsView()->isVisible()) {
+    } else if (pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) {
       pModelWidget->getIconGraphicsView()->zoomOut();
-    } else if (pModelWidget->getEditor()->isVisible()) {
+    } else if (pModelWidget->getEditor() && pModelWidget->getEditor()->isVisible()) {
       pModelWidget->getEditor()->getPlainTextEdit()->zoomOut();
     }
   }
@@ -2276,6 +2362,45 @@ void MainWindow::TLMSimulate()
 }
 
 /*!
+ * \brief MainWindow::instantiateOMSModel
+ * Slot activated when mpOMSInstantiateModelAction triggered signal is raised.
+ * Calls MainWindow::instantiateOMSModel(LibraryTreeItem*)
+ * \param checked
+ */
+void MainWindow::instantiateOMSModel(bool checked)
+{
+  ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+  if (pModelWidget) {
+    instantiateOMSModel(pModelWidget->getLibraryTreeItem(), checked);
+  }
+}
+
+/*!
+ * \brief MainWindow::simulateOMSModel
+ * Slot activated when mpOMSSimulationSetupAction triggered signal is raised.
+ * Calls MainWindow::simulateOMSModel(LibraryTreeItem*)
+ */
+void MainWindow::simulateOMSModel()
+{
+  ModelWidget *pModelWidget = mpModelWidgetContainer->getCurrentModelWidget();
+  if (pModelWidget) {
+    simulateOMSModel(pModelWidget->getLibraryTreeItem());
+  }
+}
+
+/*!
+ * \brief MainWindow::showOMSArchivedSimulations
+ * Shows the archived simulations.
+ */
+void MainWindow::showOMSArchivedSimulations()
+{
+  if (!mpOMSSimulationDialog) {
+    mpOMSSimulationDialog = new OMSSimulationDialog(this);
+  }
+  mpOMSSimulationDialog->show();
+}
+
+/*!
  * \brief MainWindow::openWorkingDirectory
  * Opens the current working directory.
  */
@@ -2418,10 +2543,20 @@ void MainWindow::openModelicaWebReference()
 }
 
 /*!
- * \brief MainWindow::openOpenModelicaTLMSimulatorDocumentationAction
+ * \brief MainWindow::openOMSimulatorUsersGuide
+ * Opens the OMSimulator Users Guide.
+ */
+void MainWindow::openOMSimulatorUsersGuide()
+{
+  QUrl OMSimulatorUsersGuideUrl (QString("https://openmodelica.org/doc/OMSimulator/html/"));
+  QDesktopServices::openUrl(OMSimulatorUsersGuideUrl);
+}
+
+/*!
+ * \brief MainWindow::openOpenModelicaTLMSimulatorDocumentation
  * Opens the OpenModelica TLM Simulator documentation.
  */
-void MainWindow::openOpenModelicaTLMSimulatorDocumentationAction()
+void MainWindow::openOpenModelicaTLMSimulatorDocumentation()
 {
   QUrl openModelicaTLMSimulatorDocumentation (QString("file:///").append(QString(Helper::OpenModelicaHome).replace("\\", "/"))
                                               .append("/OMTLMSimulator/Documentation/OMTLMSimulator.pdf"));
@@ -2940,6 +3075,15 @@ void MainWindow::createActions()
   mpLoadExternModelAction = new QAction(tr("Load External Model(s)"), this);
   mpLoadExternModelAction->setStatusTip(tr("Loads the External Model(s) for the TLM co-simulation"));
   connect(mpLoadExternModelAction, SIGNAL(triggered()), SLOT(loadExternalModels()));
+  // create new OMSimulator Model action
+  mpNewOMSimulatorModelAction = new QAction(QIcon(":/Resources/icons/new.svg"), Helper::newModel, this);
+  mpNewOMSimulatorModelAction->setStatusTip(tr("Creates a new OMSimulator Model"));
+  mpNewOMSimulatorModelAction->setShortcut(QKeySequence("Ctrl+t"));
+  connect(mpNewOMSimulatorModelAction, SIGNAL(triggered()), SLOT(createNewOMSModel()));
+  // open OMSimulator Model file action
+  mpOpenOMSModelFileAction = new QAction(QIcon(":/Resources/icons/open.svg"), tr("Open OMSimulator Model(s)"), this);
+  mpOpenOMSModelFileAction->setStatusTip(tr("Opens the OMSimulator model file(s)"));
+  connect(mpOpenOMSModelFileAction, SIGNAL(triggered()), SLOT(openOMSModelFile()));
   // open the directory action
   mpOpenDirectoryAction = new QAction(tr("Open Directory"), this);
   mpOpenDirectoryAction->setStatusTip(tr("Opens the directory"));
@@ -2974,7 +3118,6 @@ void MainWindow::createActions()
   // print  action
   mpPrintModelAction = new QAction(QIcon(":/Resources/icons/print.svg"), tr("Print..."), this);
   mpPrintModelAction->setShortcut(QKeySequence("Ctrl+p"));
-  mpPrintModelAction->setEnabled(false);
   // close OMEdit action
   mpQuitAction = new QAction(QIcon(":/Resources/icons/quit.svg"), tr("Quit"), this);
   mpQuitAction->setStatusTip(tr("Quit the ").append(Helper::applicationIntroText));
@@ -3246,10 +3389,14 @@ void MainWindow::createActions()
   mpModelicaWebReferenceAction = new QAction(tr("Modelica Web Reference"), this);
   mpModelicaWebReferenceAction->setStatusTip(tr("Opens the Modelica Web Reference"));
   connect(mpModelicaWebReferenceAction, SIGNAL(triggered()), SLOT(openModelicaWebReference()));
+  // OMSimulator users guide action
+  mpOMSimulatorUsersGuideAction = new QAction(tr("OMSimulator Users Guide"), this);
+  mpOMSimulatorUsersGuideAction->setStatusTip(tr("Opens the OMSimulator Users Guide"));
+  connect(mpOMSimulatorUsersGuideAction, SIGNAL(triggered()), SLOT(openOMSimulatorUsersGuide()));
   // OMTLMSimulator documenatation action
   mpOpenModelicaTLMSimulatorDocumentationAction = new QAction(tr("OpenModelica TLM Simulator Documentation"), this);
   mpOpenModelicaTLMSimulatorDocumentationAction->setStatusTip(tr("Opens the OpenModelica TLM Simulator Documentation"));
-  connect(mpOpenModelicaTLMSimulatorDocumentationAction, SIGNAL(triggered()), SLOT(openOpenModelicaTLMSimulatorDocumentationAction()));
+  connect(mpOpenModelicaTLMSimulatorDocumentationAction, SIGNAL(triggered()), SLOT(openOpenModelicaTLMSimulatorDocumentation()));
   // about OMEdit action
   mpAboutOMEditAction = new QAction(tr("About OMEdit"), this);
   mpAboutOMEditAction->setStatusTip(tr("Information about OMEdit"));
@@ -3322,23 +3469,24 @@ void MainWindow::createActions()
   mpNewParametricPlotWindowAction = new QAction(QIcon(":/Resources/icons/parametric-plot-window.svg"), tr("New Parametric Plot Window"), this);
   mpNewParametricPlotWindowAction->setStatusTip(tr("Inserts new parametric plot window"));
   connect(mpNewParametricPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addParametricPlotWindow()));
-
   // new array plot window action
   mpNewArrayPlotWindowAction = new QAction(QIcon(":/Resources/icons/array-plot-window.svg"), tr("New Array Plot Window"), this);
   mpNewArrayPlotWindowAction->setStatusTip(tr("Inserts new array plot window"));
   connect(mpNewArrayPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addArrayPlotWindow()));
-
   // new array parametric plot window action
   mpNewArrayParametricPlotWindowAction = new QAction(QIcon(":/Resources/icons/array-parametric-plot-window.svg"), tr("New Array Parametric Plot Window"), this);
   mpNewArrayParametricPlotWindowAction->setStatusTip(tr("Inserts new array parametric plot window"));
   connect(mpNewArrayParametricPlotWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addArrayParametricPlotWindow()));
-
-  #if !defined(WITHOUT_OSG)
+#if !defined(WITHOUT_OSG)
   // new mpAnimationWindowAction plot action
   mpNewAnimationWindowAction = new QAction(QIcon(":/Resources/icons/animation.svg"), tr("New Animation Window"), this);
   mpNewAnimationWindowAction->setStatusTip(tr("Inserts new animation window"));
   connect(mpNewAnimationWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addAnimationWindow()));
 #endif
+  // Diagram window action
+  mpDiagramWindowAction = new QAction(QIcon(":/Resources/icons/modeling.png"), tr("Diagram Window"), this);
+  mpDiagramWindowAction->setStatusTip(tr("Inserts a diagram window"));
+  connect(mpDiagramWindowAction, SIGNAL(triggered()), mpPlotWindowContainer, SLOT(addDiagramWindow()));
   // export variables action
   mpExportVariablesAction = new QAction(QIcon(":/Resources/icons/export-variables.svg"), Helper::exportVariables, this);
   mpExportVariablesAction->setStatusTip(tr("Exports the plotted variables to a CSV file"));
@@ -3351,11 +3499,10 @@ void MainWindow::createActions()
   // export as image action
   mpExportAsImageAction = new QAction(QIcon(":/Resources/icons/bitmap-shape.svg"), Helper::exportAsImage, this);
   mpExportAsImageAction->setStatusTip(Helper::exportAsImageTip);
-  mpExportAsImageAction->setEnabled(false);
   connect(mpExportAsImageAction, SIGNAL(triggered()), SLOT(exportModelAsImage()));
+  // export to clipboard action
   mpExportToClipboardAction = new QAction(tr("Export to Clipboard"), this);
   mpExportToClipboardAction->setStatusTip(Helper::exportAsImageTip);
-  mpExportToClipboardAction->setEnabled(false);
   connect(mpExportToClipboardAction, SIGNAL(triggered()), SLOT(exportToClipboard()));
   // simulation parameters
   mpSimulationParamsAction = new QAction(QIcon(":/Resources/icons/simulation-parameters.svg"), Helper::simulationParams, this);
@@ -3372,6 +3519,40 @@ void MainWindow::createActions()
   mpTLMCoSimulationAction->setStatusTip(Helper::tlmCoSimulationSetupTip);
   mpTLMCoSimulationAction->setEnabled(false);
   connect(mpTLMCoSimulationAction, SIGNAL(triggered()), SLOT(TLMSimulate()));
+  // Add System Action
+  mpAddSystemAction = new QAction(QIcon(":/Resources/icons/add-system.svg"), Helper::addSystem, this);
+  mpAddSystemAction->setStatusTip(Helper::addSystemTip);
+  // Add or Edit icon Action
+  mpAddOrEditIconAction = new QAction(QIcon(":/Resources/icons/bitmap-shape.svg"), tr("Add/Edit Icon"), this);
+  mpAddOrEditIconAction->setStatusTip(tr("Adds/Edits an icon"));
+  // delete icon action
+  mpDeleteIconAction = new QAction(QIcon(":/Resources/icons/bitmap-delete.svg"), tr("Delete Icon"), this);
+  mpDeleteIconAction->setStatusTip(tr("Deletes an icon"));
+  // Add connector action
+  mpAddConnectorAction = new QAction(QIcon(":/Resources/icons/add-connector.svg"), Helper::addConnector, this);
+  mpAddConnectorAction->setStatusTip(Helper::addConnectorTip);
+  // Add bus action
+  mpAddBusAction = new QAction(QIcon(":/Resources/icons/bus.svg"), Helper::addBus, this);
+  mpAddBusAction->setStatusTip(Helper::addBusTip);
+  // Add tlm bus action
+  mpAddTLMBusAction = new QAction(QIcon(":/Resources/icons/tlm-bus.svg"), Helper::addTLMBus, this);
+  mpAddTLMBusAction->setStatusTip(Helper::addTLMBusTip);
+  // Add SubModel Action
+  mpAddSubModelAction = new QAction(QIcon(":/Resources/icons/import-fmu.svg"), Helper::addSubModel, this);
+  mpAddSubModelAction->setStatusTip(Helper::addSubModelTip);
+  // OMSimulator simulation setup action
+  mpOMSInstantiateModelAction = new QAction(QIcon(":/Resources/icons/instantiate.svg"), Helper::instantiateModel, this);
+  mpOMSInstantiateModelAction->setStatusTip(Helper::instantiateOMSModelTip);
+  mpOMSInstantiateModelAction->setCheckable(true);
+  connect(mpOMSInstantiateModelAction, SIGNAL(triggered(bool)), SLOT(instantiateOMSModel(bool)));
+  // OMSimulator simulation setup action
+  mpOMSSimulateAction = new QAction(QIcon(":/Resources/icons/tlm-simulate.svg"), Helper::simulate, this);
+  mpOMSSimulateAction->setStatusTip(Helper::OMSSimulateTip);
+  connect(mpOMSSimulateAction, SIGNAL(triggered()), SLOT(simulateOMSModel()));
+  // Archived simulations
+  mpOMSArchivedSimulationsAction = new QAction(Helper::archivedSimulations, this);
+  mpOMSArchivedSimulationsAction->setStatusTip(Helper::archivedSimulations);
+  connect(mpOMSArchivedSimulationsAction, SIGNAL(triggered()), SLOT(showOMSArchivedSimulations()));
 }
 
 //! Creates the menus
@@ -3471,6 +3652,7 @@ void MainWindow::createMenus()
   pViewToolbarsMenu->addAction(mpPlotToolBar->toggleViewAction());
   pViewToolbarsMenu->addAction(mpDebuggerToolBar->toggleViewAction());
   pViewToolbarsMenu->addAction(mpTLMSimulationToolbar->toggleViewAction());
+  pViewToolbarsMenu->addAction(mpOMSimulatorToobar->toggleViewAction());
   // Add Actions to Windows View Sub Menu
   pViewWindowsMenu->addAction(mpLibraryDockWidget->toggleViewAction());
   pViewWindowsMenu->addAction(mpDocumentationDockWidget->toggleViewAction());
@@ -3546,6 +3728,29 @@ void MainWindow::createMenus()
   pDebugMenu->addAction(mpAttachDebuggerToRunningProcessAction);
   // add Debug menu to menu bar
   menuBar()->addAction(pDebugMenu->menuAction());
+  // OMSimulator menu
+  QMenu *pOMSimulatorMenu = new QMenu(menuBar());
+  pOMSimulatorMenu->setTitle(tr("&OMSimulator"));
+  // add actions to OMSimulator menu
+  pOMSimulatorMenu->addAction(mpNewOMSimulatorModelAction);
+  pOMSimulatorMenu->addAction(mpOpenOMSModelFileAction);
+  pOMSimulatorMenu->addSeparator();
+  pOMSimulatorMenu->addAction(mpAddSystemAction);
+  pOMSimulatorMenu->addSeparator();
+  pOMSimulatorMenu->addAction(mpAddOrEditIconAction);
+  pOMSimulatorMenu->addAction(mpDeleteIconAction);
+  pOMSimulatorMenu->addSeparator();
+  pOMSimulatorMenu->addAction(mpAddConnectorAction);
+  pOMSimulatorMenu->addAction(mpAddBusAction);
+  pOMSimulatorMenu->addAction(mpAddTLMBusAction);
+  pOMSimulatorMenu->addSeparator();
+  pOMSimulatorMenu->addAction(mpAddSubModelAction);
+  pOMSimulatorMenu->addSeparator();
+  pOMSimulatorMenu->addAction(mpOMSInstantiateModelAction);
+  pOMSimulatorMenu->addAction(mpOMSSimulateAction);
+  pOMSimulatorMenu->addAction(mpOMSArchivedSimulationsAction);
+  // add OMSimulator menu to menu bar
+  menuBar()->addAction(pOMSimulatorMenu->menuAction());
   // Git menu
   QMenu *pGitMenu = new QMenu(menuBar());
   pGitMenu->setTitle(tr("&Git"));
@@ -3605,6 +3810,7 @@ void MainWindow::createMenus()
   //  pHelpMenu->addAction(mpModelicaByExampleAction);
   //  pHelpMenu->addAction(mpModelicaWebReferenceAction);
   //  pHelpMenu->addSeparator();
+  pHelpMenu->addAction(mpOMSimulatorUsersGuideAction);
   pHelpMenu->addAction(mpOpenModelicaTLMSimulatorDocumentationAction);
   pHelpMenu->addSeparator();
   pHelpMenu->addAction(mpAboutOMEditAction);
@@ -3673,6 +3879,7 @@ void MainWindow::switchToWelcomePerspective()
   mpPlotToolBar->setVisible(false);
   mpPlotToolBar->setEnabled(false);
   mpTLMSimulationToolbar->setVisible(false);
+  mpOMSimulatorToobar->setVisible(false);
 }
 
 /*!
@@ -3697,6 +3904,7 @@ void MainWindow::switchToModelingPerspective()
   mpPlotToolBar->setVisible(false);
   mpPlotToolBar->setEnabled(false);
   mpTLMSimulationToolbar->setVisible(true);
+  mpOMSimulatorToobar->setVisible(true);
   // In case user has tabbed the dock widgets then make LibraryWidget active.
   QList<QDockWidget*> tabifiedDockWidgetsList = tabifiedDockWidgets(mpLibraryDockWidget);
   if (tabifiedDockWidgetsList.size() > 0) {
@@ -3734,6 +3942,10 @@ void MainWindow::switchToPlottingPerspective()
   if (mpPlotWindowContainer->subWindowList().size() == 0) {
     mpPlotWindowContainer->addPlotWindow(true);
   }
+  // if we have DiagramWindow then draw items on it based on the current ModelWidget
+  if (pModelWidget && mpPlotWindowContainer->getDiagramSubWindowFromMdi()) {
+    mpPlotWindowContainer->getDiagramWindow()->drawDiagram();
+  }
   mpVariablesDockWidget->show();
   // show/hide toolbars
   mpEditToolBar->setVisible(false);
@@ -3746,6 +3958,7 @@ void MainWindow::switchToPlottingPerspective()
   mpPlotToolBar->setVisible(true);
   mpPlotToolBar->setEnabled(true);
   mpTLMSimulationToolbar->setVisible(false);
+  mpOMSimulatorToobar->setVisible(false);
   // In case user has tabbed the dock widgets then make VariablesWidget active.
   QList<QDockWidget*> tabifiedDockWidgetsList = tabifiedDockWidgets(mpVariablesDockWidget);
   if (tabifiedDockWidgetsList.size() > 0) {
@@ -3782,7 +3995,8 @@ void MainWindow::switchToAlgorithmicDebuggingPerspective()
   enableReSimulationToolbar(mpVariablesDockWidget->isVisible());
   mpPlotToolBar->setVisible(false);
   mpPlotToolBar->setEnabled(false);
-  mpTLMSimulationToolbar->setVisible(true);
+  mpTLMSimulationToolbar->setVisible(false);
+  mpOMSimulatorToobar->setVisible(false);
   // In case user has tabbed the dock widgets then make LibraryWidget active.
   QList<QDockWidget*> tabifiedDockWidgetsList = tabifiedDockWidgets(mpLibraryDockWidget);
   if (tabifiedDockWidgetsList.size() > 0) {
@@ -3971,8 +4185,9 @@ void MainWindow::createToolbars()
   mpPlotToolBar->addAction(mpNewArrayParametricPlotWindowAction);
 #if !defined(WITHOUT_OSG)
   mpPlotToolBar->addAction(mpNewAnimationWindowAction);
-  mpPlotToolBar->addSeparator();
 #endif
+  mpPlotToolBar->addAction(mpDiagramWindowAction);
+  mpPlotToolBar->addSeparator();
   mpPlotToolBar->addAction(mpExportVariablesAction);
   mpPlotToolBar->addSeparator();
   mpPlotToolBar->addAction(mpClearPlotWindowAction);
@@ -4002,6 +4217,24 @@ void MainWindow::createToolbars()
   mpTLMSimulationToolbar->addAction(mpAlignInterfacesAction);
   mpTLMSimulationToolbar->addSeparator();
   mpTLMSimulationToolbar->addAction(mpTLMCoSimulationAction);
+  // OMSimulator Toolbar
+  mpOMSimulatorToobar = addToolBar(tr("OMSimulator Toolbar"));
+  mpOMSimulatorToobar->setObjectName("OMSimulator Toolbar");
+  mpOMSimulatorToobar->setAllowedAreas(Qt::TopToolBarArea);
+  // add actions to OMSimulator Toolbar
+  mpOMSimulatorToobar->addAction(mpAddSystemAction);
+  mpOMSimulatorToobar->addSeparator();
+  mpOMSimulatorToobar->addAction(mpAddOrEditIconAction);
+  mpOMSimulatorToobar->addAction(mpDeleteIconAction);
+  mpOMSimulatorToobar->addSeparator();
+  mpOMSimulatorToobar->addAction(mpAddConnectorAction);
+  mpOMSimulatorToobar->addAction(mpAddBusAction);
+  mpOMSimulatorToobar->addAction(mpAddTLMBusAction);
+  mpOMSimulatorToobar->addSeparator();
+  mpOMSimulatorToobar->addAction(mpAddSubModelAction);
+  mpOMSimulatorToobar->addSeparator();
+  mpOMSimulatorToobar->addAction(mpOMSInstantiateModelAction);
+  mpOMSimulatorToobar->addAction(mpOMSSimulateAction);
 }
 
 //! when the dragged object enters the main window
@@ -4058,7 +4291,8 @@ AboutOMEditDialog::AboutOMEditDialog(MainWindow *pMainWindow)
   const QString aboutText = tr(
      "<h2>%1 - %2</h2>"
      "<b>%3</b><br />"
-     "<b>Connected to %4</b><br /><br />"
+     "<b>Connected to %4</b><br />"
+     "<b>Connected to %5</b><br /><br />"
      "Copyright <b>Open Source Modelica Consortium (OSMC)</b>.<br />"
      "Distributed under OSMC-PL and GPL, see <u><a href=\"http://www.openmodelica.org\">www.openmodelica.org</a></u>.<br /><br />"
      "Initially developed by <b>Adeel Asghar</b> and <b>Sonia Tariq</b> as part of their final master thesis."
@@ -4088,7 +4322,8 @@ AboutOMEditDialog::AboutOMEditDialog(MainWindow *pMainWindow)
      .arg(Helper::applicationName,
           Helper::applicationIntroText,
           GIT_SHA,
-          Helper::OpenModelicaVersion);
+          Helper::OpenModelicaVersion,
+          oms3_getVersion());
   // about text label
   Label *pAboutTextLabel = new Label(aboutText);
   pAboutTextLabel->setWordWrap(true);

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -126,6 +126,30 @@ TextAnnotation::TextAnnotation(QString annotation, LineAnnotation *pLineAnnotati
 }
 
 /*!
+ * \brief TextAnnotation::TextAnnotation
+ * Used by OMSimulator FMU ModelWidget\n
+ * We always make this shape as inherited shape since its not allowed to be modified.
+ * \param pGraphicsView
+ */
+TextAnnotation::TextAnnotation(GraphicsView *pGraphicsView)
+  : ShapeAnnotation(true, pGraphicsView, 0)
+{
+  mpComponent = 0;
+  // set the default values
+  GraphicItem::setDefaults();
+  FilledShape::setDefaults();
+  ShapeAnnotation::setDefaults();
+  // give a reasonable size
+  mExtents.replace(0, QPointF(-100, 20));
+  mExtents.replace(1, QPointF(100, -20));
+  setTextString("%name");
+  initUpdateTextString();
+  setPos(mOrigin);
+  setRotation(mRotation);
+  setShapeFlags(true);
+}
+
+/*!
  * \brief TextAnnotation::parseShapeAnnotation
  * Parses the text annotation string
  * \param annotation - text annotation string.
@@ -245,6 +269,26 @@ void TextAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
     return;
   }
   if (mVisible || !mDynamicVisible.isEmpty()) {
+    // state machine visualization
+    // text annotation on a component
+    if (mpComponent && mpComponent->getLibraryTreeItem() && mpComponent->getLibraryTreeItem()->isState()
+        && mpComponent->getGraphicsView()->isVisualizationView()) {
+      if (mpComponent->isActiveState()) {
+        painter->setOpacity(1.0);
+      } else {
+        painter->setOpacity(0.2);
+      }
+    }
+    // text annotation on a transition
+    LineAnnotation *pTransitionLineAnnotation = dynamic_cast<LineAnnotation*>(parentItem());
+    if (pTransitionLineAnnotation && pTransitionLineAnnotation->getLineType() == LineAnnotation::TransitionType
+        && pTransitionLineAnnotation->getGraphicsView() && pTransitionLineAnnotation->getGraphicsView()->isVisualizationView()) {
+      if (pTransitionLineAnnotation->isActiveState()) {
+        painter->setOpacity(1.0);
+      } else {
+        painter->setOpacity(0.2);
+      }
+    }
     drawTextAnnotaion(painter);
   }
 }
@@ -559,7 +603,7 @@ void TextAnnotation::updateTextString()
     if (mOriginalTextString.toLower().contains("%name")) {
       mTextString.replace(QRegExp("%name"), mpComponent->getName());
     }
-    if (mOriginalTextString.toLower().contains("%class")) {
+    if (mOriginalTextString.toLower().contains("%class") && mpComponent->getLibraryTreeItem()) {
       mTextString.replace(QRegExp("%class"), mpComponent->getLibraryTreeItem()->getNameStructure());
     }
     if (!mTextString.contains("%")) {

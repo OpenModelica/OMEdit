@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -52,6 +52,7 @@ class TextEditorPage;
 class ModelicaEditorPage;
 class MetaModelicaEditorPage;
 class CompositeModelEditorPage;
+class OMSimulatorEditorPage;
 class CEditorPage;
 class HTMLEditorPage;
 class GraphicalViewsPage;
@@ -65,6 +66,7 @@ class FigaroPage;
 class DebuggerPage;
 class FMIPage;
 class TLMPage;
+class OMSimulatorPage;
 class TraceabilityPage;
 class TabSettings;
 class StackFramesWidget;
@@ -90,6 +92,7 @@ public:
   void readModelicaEditorSettings();
   void readMetaModelicaEditorSettings();
   void readCompositeModelEditorSettings();
+  void readOMSimulatorEditorSettings();
   void readCEditorSettings();
   void readHTMLEditorSettings();
   void readGraphicalViewsSettings();
@@ -103,6 +106,7 @@ public:
   void readDebuggerSettings();
   void readFMISettings();
   void readTLMSettings();
+  void readOMSimulatorSettings();
   void readTraceabilitySettings();
   void saveGeneralSettings();
   void saveLibrariesSettings();
@@ -110,9 +114,11 @@ public:
   void saveModelicaEditorSettings();
   void saveMetaModelicaEditorSettings();
   void saveCompositeModelEditorSettings();
+  void saveOMSimulatorEditorSettings();
   void saveCEditorSettings();
   void saveHTMLEditorSettings();
   void saveTLMSettings();
+  void saveOMSimulatorSettings();
   void saveTraceabilitySettings();
   void saveGraphicalViewsSettings();
   void saveSimulationSettings();
@@ -133,6 +139,7 @@ public:
   ModelicaEditorPage* getModelicaEditorPage() {return mpModelicaEditorPage;}
   MetaModelicaEditorPage* getMetaModelicaEditorPage() {return mpMetaModelicaEditorPage;}
   CompositeModelEditorPage* getCompositeModelEditorPage() {return mpCompositeModelEditorPage;}
+  OMSimulatorEditorPage* getOMSimulatorEditorPage() {return mpOMSimulatorEditorPage;}
   CEditorPage* getCEditorPage() {return mpCEditorPage;}
   HTMLEditorPage* getHTMLEditorPage() {return mpHTMLEditorPage;}
   GraphicalViewsPage* getGraphicalViewsPage() {return mpGraphicalViewsPage;}
@@ -146,6 +153,7 @@ public:
   DebuggerPage* getDebuggerPage() {return mpDebuggerPage;}
   FMIPage* getFMIPage() {return mpFMIPage;}
   TLMPage* getTLMPage() {return mpTLMPage;}
+  OMSimulatorPage* getOMSimulatorPage() {return mpOMSimulatorPage;}
   TraceabilityPage* getTraceabilityPage() {return mpTraceabilityPage;}
   void emitModelicaEditorSettingsChanged() {emit modelicaEditorSettingsChanged();}
   void saveDialogGeometry();
@@ -156,6 +164,7 @@ signals:
   void modelicaEditorSettingsChanged();
   void metaModelicaEditorSettingsChanged();
   void compositeModelEditorSettingsChanged();
+  void omsimulatorEditorSettingsChanged();
   void cEditorSettingsChanged();
   void HTMLEditorSettingsChanged();
 public slots:
@@ -169,6 +178,7 @@ private:
   ModelicaEditorPage *mpModelicaEditorPage;
   MetaModelicaEditorPage *mpMetaModelicaEditorPage;
   CompositeModelEditorPage *mpCompositeModelEditorPage;
+  OMSimulatorEditorPage *mpOMSimulatorEditorPage;
   CEditorPage *mpCEditorPage;
   HTMLEditorPage *mpHTMLEditorPage;
   GraphicalViewsPage *mpGraphicalViewsPage;
@@ -182,6 +192,7 @@ private:
   DebuggerPage *mpDebuggerPage;
   FMIPage *mpFMIPage;
   TLMPage *mpTLMPage;
+  OMSimulatorPage *mpOMSimulatorPage;
   TraceabilityPage *mpTraceabilityPage;
   QSettings *mpSettings;
   QListWidget *mpOptionsList;
@@ -209,6 +220,7 @@ public:
   void setTerminalCommandArguments(QString value) {mpTerminalCommandArgumentsTextBox->setText(value);}
   QString getTerminalCommandArguments() {return mpTerminalCommandArgumentsTextBox->text();}
   QCheckBox* getHideVariablesBrowserCheckBox() {return mpHideVariablesBrowserCheckBox;}
+  QCheckBox* getActivateAccessAnnotationsCheckBox() {return mpActivateAccessAnnotationsCheckBox;}
   QSpinBox* getLibraryIconSizeSpinBox() {return mpLibraryIconSizeSpinBox;}
   void setShowProtectedClasses(bool value) {mpShowProtectedClasses->setChecked(value);}
   bool getShowProtectedClasses() {return mpShowProtectedClasses->isChecked();}
@@ -240,6 +252,7 @@ private:
   Label *mpTerminalCommandArgumentsLabel;
   QLineEdit *mpTerminalCommandArgumentsTextBox;
   QCheckBox *mpHideVariablesBrowserCheckBox;
+  QCheckBox *mpActivateAccessAnnotationsCheckBox;
   QGroupBox *mpLibrariesBrowserGroupBox;
   Label *mpLibraryIconSizeLabel;
   QSpinBox *mpLibraryIconSizeSpinBox;
@@ -442,6 +455,24 @@ public slots:
   void setLineWrapping(bool enabled);
 };
 
+class OMSimulatorEditorPage : public QWidget
+{
+  Q_OBJECT
+public:
+  OMSimulatorEditorPage(OptionsDialog *pOptionsDialog);
+  OptionsDialog* getOptionsDialog() {return mpOptionsDialog;}
+  void setColor(QString item, QColor color);
+  QColor getColor(QString item);
+  void emitUpdatePreview() {emit updatePreview();}
+private:
+  OptionsDialog *mpOptionsDialog;
+  CodeColorsWidget *mpCodeColorsWidget;
+signals:
+  void updatePreview();
+public slots:
+  void setLineWrapping(bool enabled);
+};
+
 class CEditorPage : public QWidget
 {
   Q_OBJECT
@@ -567,7 +598,7 @@ public:
   QComboBox* getIndexReductionMethodComboBox() {return mpIndexReductionMethodComboBox;}
   QComboBox* getTargetLanguageComboBox() {return mpTargetLanguageComboBox;}
   QComboBox* getTargetCompilerComboBox() {return mpTargetCompilerComboBox;}
-  QLineEdit* getOMCFlagsTextBox() {return mpOMCFlagsTextBox;}
+  QLineEdit* getOMCCommandLineOptionsTextBox() {return mpOMCCommandLineOptionsTextBox;}
   QCheckBox* getIgnoreCommandLineOptionsAnnotationCheckBox() {return mpIgnoreCommandLineOptionsAnnotationCheckBox;}
   QCheckBox* getIgnoreSimulationFlagsAnnotationCheckBox() {return mpIgnoreSimulationFlagsAnnotationCheckBox;}
   QCheckBox* getSaveClassBeforeSimulationCheckBox() {return mpSaveClassBeforeSimulationCheckBox;}
@@ -588,9 +619,9 @@ private:
   QComboBox *mpTargetLanguageComboBox;
   Label *mpCompilerLabel;
   QComboBox *mpTargetCompilerComboBox;
-  Label *mpOMCFlagsLabel;
-  QLineEdit *mpOMCFlagsTextBox;
-  QToolButton *mpOMCFlagsHelpButton;
+  Label *mpOMCCommandLineOptionsLabel;
+  QLineEdit *mpOMCCommandLineOptionsTextBox;
+  QToolButton *mpOMCCommandLineOptionsHelpButton;
   QCheckBox *mpIgnoreCommandLineOptionsAnnotationCheckBox;
   QCheckBox *mpIgnoreSimulationFlagsAnnotationCheckBox;
   QCheckBox *mpSaveClassBeforeSimulationCheckBox;
@@ -604,7 +635,7 @@ private:
 public slots:
   void updateMatchingAlgorithmToolTip(int index);
   void updateIndexReductionToolTip(int index);
-  void showOMCFlagsHelp();
+  void showOMCCommandLineOptionsHelp();
 };
 
 class MessagesPage : public QWidget
@@ -838,8 +869,8 @@ class FMIPage : public QWidget
   Q_OBJECT
 public:
   FMIPage(OptionsDialog *pOptionsDialog);
-  void setFMIExportVersion(double version);
-  double getFMIExportVersion();
+  void setFMIExportVersion(QString version);
+  QString getFMIExportVersion();
   void setFMIExportType(QString type);
   QString getFMIExportType();
   QLineEdit* getFMUNameTextBox() {return mpFMUNameTextBox;}
@@ -891,6 +922,26 @@ private slots:
   void browseTLMPluginPath();
   void browseTLMManagerProcess();
   void browseTLMMonitorProcess();
+};
+
+class OMSimulatorPage : public QWidget
+{
+  Q_OBJECT
+public:
+  OMSimulatorPage(OptionsDialog *pOptionsDialog);
+  void setWorkingDirectory(QString value) {mpWorkingDirectoryTextBox->setText(value);}
+  QString getWorkingDirectory() {return mpWorkingDirectoryTextBox->text();}
+  QComboBox* getLoggingLevelComboBox() {return mpLoggingLevelComboBox;}
+private:
+  OptionsDialog *mpOptionsDialog;
+  QGroupBox *mpGeneralGroupBox;
+  Label *mpWorkingDirectoryLabel;
+  QLineEdit *mpWorkingDirectoryTextBox;
+  QPushButton *mpBrowseWorkingDirectoryButton;
+  Label *mpLoggingLevelLabel;
+  QComboBox *mpLoggingLevelComboBox;
+private slots:
+  void browseWorkingDirectory();
 };
 
 class TraceabilityPage : public QWidget

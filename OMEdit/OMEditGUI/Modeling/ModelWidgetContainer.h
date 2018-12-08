@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -42,10 +42,12 @@
 #include "Editors/BaseEditor.h"
 #include "Editors/ModelicaEditor.h"
 #include "Editors/CompositeModelEditor.h"
+#include "Editors/OMSimulatorEditor.h"
 #include "Editors/CEditor.h"
 #include "Editors/TextEditor.h"
 #include "Editors/MetaModelicaEditor.h"
 #include "LibraryTreeWidget.h"
+#include "OMSimulator.h"
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -83,6 +85,7 @@ class GraphicsView : public QGraphicsView
 private:
   StringHandler::ViewType mViewType;
   ModelWidget *mpModelWidget;
+  bool mVisualizationView;
   QRectF mExtentRectangle;
   bool mIsCustomScale;
   bool mAddClassAnnotationNeeded;
@@ -133,11 +136,12 @@ private:
   QAction *mpSetInitialStateAction;
   QAction *mpCancelTransitionAction;
 public:
-  GraphicsView(StringHandler::ViewType viewType, ModelWidget *parent);
+  GraphicsView(StringHandler::ViewType viewType, ModelWidget *parent, bool visualizationView = false);
   CoOrdinateSystem mCoOrdinateSystem;
   bool mSkipBackground; /* Do not draw the background rectangle */
   StringHandler::ViewType getViewType() {return mViewType;}
   ModelWidget* getModelWidget() {return mpModelWidget;}
+  bool isVisualizationView() {return mVisualizationView;}
   void setExtentRectangle(qreal x1, qreal y1, qreal x2, qreal y2);
   QRectF getExtentRectangle() {return mExtentRectangle;}
   void setIsCustomScale(bool enable) {mIsCustomScale = enable;}
@@ -199,7 +203,7 @@ public:
   QList<Component*> getInheritedComponentsList() {return mInheritedComponentsList;}
   QList<LineAnnotation*> getConnectionsList() {return mConnectionsList;}
   QList<LineAnnotation*> getInheritedConnectionsList() {return mInheritedConnectionsList;}
-  void addConnectionToClass(LineAnnotation *pConnectionLineAnnotation);
+  bool addConnectionToClass(LineAnnotation *pConnectionLineAnnotation);
   void deleteConnectionFromClass(LineAnnotation *pConnectionLineAnnotation);
   void updateConnectionInClass(LineAnnotation *pConnectionLineAnnotation);
   void addConnectionToList(LineAnnotation *pConnectionLineAnnotation) {mConnectionsList.append(pConnectionLineAnnotation);}
@@ -212,11 +216,13 @@ public:
   void deleteTransitionFromClass(LineAnnotation *pTransitionLineAnnotation);
   void addTransitionToList(LineAnnotation *pTransitionLineAnnotation) {mTransitionsList.append(pTransitionLineAnnotation);}
   void deleteTransitionFromList(LineAnnotation *pTransitionLineAnnotation) {mTransitionsList.removeOne(pTransitionLineAnnotation);}
+  void removeTransitionsFromView();
   QList<LineAnnotation*> getInitialStatesList() {return mInitialStatesList;}
   void addInitialStateToClass(LineAnnotation *pInitialStateLineAnnotation);
   void deleteInitialStateFromClass(LineAnnotation *pInitialStateLineAnnotation);
   void addInitialStateToList(LineAnnotation *pInitialStateLineAnnotation) {mInitialStatesList.append(pInitialStateLineAnnotation);}
   void deleteInitialStateFromList(LineAnnotation *pInitialStateLineAnnotation) {mInitialStatesList.removeOne(pInitialStateLineAnnotation);}
+  void removeInitialStatesFromView();
   void addShapeToList(ShapeAnnotation *pShape, int index = -1);
   void addInheritedShapeToList(ShapeAnnotation *pShape) {mInheritedShapesList.append(pShape);}
   void deleteShape(ShapeAnnotation *pShapeAnnotation);
@@ -230,6 +236,8 @@ public:
   void removeAllComponents() {mComponentsList.clear();}
   void removeAllShapes() {mShapesList.clear();}
   void removeAllConnections() {mConnectionsList.clear();}
+  void removeAllTransitions() {mTransitionsList.clear();}
+  void removeAllInitialStates() {mInitialStatesList.clear();}
   void createLineShape(QPointF point);
   void createPolygonShape(QPointF point);
   void createRectangleShape(QPointF point);
@@ -244,6 +252,9 @@ public:
   void addItem(QGraphicsItem *pGraphicsItem);
   void removeItem(QGraphicsItem *pGraphicsItem);
   void fitInViewInternal();
+  void addSystem(QString name, oms_system_enu_t type);
+  void addSubModel(QString name, QString path);
+  void deleteSubModel(QString name);
 private:
   void createActions();
   bool isClassDroppedOnItself(LibraryTreeItem *pLibraryTreeItem);
@@ -356,6 +367,20 @@ private slots:
   void openLatestNewsItem(QListWidgetItem *pItem);
 };
 
+class UndoCommand;
+class UndoStack : public QUndoStack
+{
+  Q_OBJECT
+public:
+  UndoStack(QObject *parent = 0);
+  void push(UndoCommand *cmd);
+
+  bool isEnabled() {return mEnabled;}
+  void setEnabled(bool enable) {mEnabled = enable;}
+private:
+  bool mEnabled;
+};
+
 class ModelWidgetContainer;
 class ModelicaHighlighter;
 class CompositeModelHighlighter;
@@ -374,7 +399,7 @@ public:
   QToolButton* getDocumentationViewToolButton() {return mpDocumentationViewToolButton;}
   GraphicsView* getDiagramGraphicsView() {return mpDiagramGraphicsView;}
   GraphicsView* getIconGraphicsView() {return mpIconGraphicsView;}
-  QUndoStack* getUndoStack() {return mpUndoStack;}
+  UndoStack* getUndoStack() {return mpUndoStack;}
   BaseEditor* getEditor() {return mpEditor;}
   void setModelClassPathLabel(QString path) {mpModelClassPathLabel->setText(path);}
   void setModelFilePathLabel(QString path) {mpModelFilePathLabel->setText(path);}
@@ -383,6 +408,7 @@ public:
   void removeInheritedClass(LibraryTreeItem *pLibraryTreeItem) {mInheritedClassesList.removeOne(pLibraryTreeItem);}
   void clearInheritedClasses() {mInheritedClassesList.clear();}
   QList<LibraryTreeItem*> getInheritedClassesList() {return mInheritedClassesList;}
+  QList<ComponentInfo*> getComponentsList() {return mComponentsList;}
   QMap<QString, QString> getExtendsModifiersMap(QString extendsClass);
   void fetchExtendsModifiers(QString extendsClass);
   void reDrawModelWidgetInheritedClasses();
@@ -396,15 +422,17 @@ public:
   void loadConnections();
   void getModelConnections();
   void createModelWidgetComponents();
+  ShapeAnnotation* drawOMSModelElement();
   Component* getConnectorComponent(Component *pConnectorComponent, QString connectorName);
   void clearGraphicsViews();
   void reDrawModelWidget();
   bool validateText(LibraryTreeItem **pLibraryTreeItem);
   bool modelicaEditorTextChanged(LibraryTreeItem **pLibraryTreeItem);
   void updateChildClasses(LibraryTreeItem *pLibraryTreeItem);
+  bool omsimulatorEditorTextChanged();
   void clearSelection();
   void updateClassAnnotationIfNeeded();
-  void updateModelText(bool updateText = true);
+  void updateModelText();
   void updateModelicaTextManually(QString contents);
   void updateUndoRedoActions();
   void updateDynamicResults(QString resultFileName);
@@ -414,6 +442,9 @@ public:
   void beginMacro(const QString &text);
   void endMacro();
   void updateViewButtonsBasedOnAccess();
+  void associateBusWithConnector(QString busName, QString connectorName);
+  void dissociateBusWithConnector(QString busName, QString connectorName);
+  void associateBusWithConnectors(QString busName);
 private:
   ModelWidgetContainer *mpModelWidgetContainer;
   LibraryTreeItem *mpLibraryTreeItem;
@@ -432,7 +463,7 @@ private:
   GraphicsScene *mpDiagramGraphicsScene;
   GraphicsView *mpIconGraphicsView;
   GraphicsScene *mpIconGraphicsScene;
-  QUndoStack *mpUndoStack;
+  UndoStack *mpUndoStack;
   QUndoView *mpUndoView;
   BaseEditor *mpEditor;
   QStatusBar *mpModelStatusBar;
@@ -467,6 +498,12 @@ private:
   QString getCompositeModelName();
   void getCompositeModelSubModels();
   void getCompositeModelConnections();
+  void drawOMSModelIconElements();
+  void drawOMSModelDiagramElements();
+  void drawOMSModelConnections();
+  void associateBusWithConnector(QString busName, QString connectorName, GraphicsView *pGraphicsView);
+  void dissociateBusWithConnector(QString busName, QString connectorName, GraphicsView *pGraphicsView);
+  void associateBusWithConnectors(Component *pBusComponent, GraphicsView *pGraphicsView);
 private slots:
   void showIconView(bool checked);
   void showDiagramView(bool checked);
@@ -520,6 +557,13 @@ public slots:
   void printModel();
   void showSimulationParams();
   void alignInterfaces();
+  void addSystem();
+  void addOrEditIcon();
+  void deleteIcon();
+  void addConnector();
+  void addBus();
+  void addTLMBus();
+  void addSubModel();
 };
 
 #endif // MODELWIDGETCONTAINER_H

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -41,6 +41,7 @@
 #include "Util/StringHandler.h"
 #include "Modeling/ModelWidgetContainer.h"
 #include "Commands.h"
+#include "Modeling/ItemDelegate.h"
 
 #include <QApplication>
 #include <QMessageBox>
@@ -1260,25 +1261,25 @@ GraphicsViewProperties::GraphicsViewProperties(GraphicsView *pGraphicsView)
   if (!mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isTopLevel()) {
     mpTabWidget->setTabEnabled(1, false);
   }
-  // OMC Flags tab
-  QWidget *pOMCFlagsWidget = new QWidget;
-  mpOMCFlagsLabel = new Label(Helper::OMCFlagsTip);
-  mpOMCFlagsTextBox = new QPlainTextEdit;
+  // OMC CommandLineOptions tab
+  QWidget *pOMCCommandLineOptionsWidget = new QWidget;
+  mpOMCCommandLineOptionsLabel = new Label(Helper::OMCCommandLineOptionsTip);
+  mpOMCCommandLineOptionsTextBox = new QPlainTextEdit;
   // get the command line options annotation
-  mOMCFlags = pOMCProxy->getCommandLineOptionsAnnotation(mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getNameStructure());
-  mpOMCFlagsTextBox->insertPlainText(mOMCFlags);
-  // OMC Flags tab layout
-  QGridLayout *pOMCFlagsGridLayout = new QGridLayout;
-  pOMCFlagsGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-  pOMCFlagsGridLayout->addWidget(mpOMCFlagsLabel, 0, 0);
-  pOMCFlagsGridLayout->addWidget(mpOMCFlagsTextBox, 1, 0);
-  pOMCFlagsWidget->setLayout(pOMCFlagsGridLayout);
-  mpTabWidget->addTab(pOMCFlagsWidget, Helper::OMCFlags);
+  mOMCCommandLineOptions = pOMCProxy->getCommandLineOptionsAnnotation(mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getNameStructure());
+  mpOMCCommandLineOptionsTextBox->insertPlainText(mOMCCommandLineOptions);
+  // OMC CommandLineOptions tab layout
+  QGridLayout *pOMCCommandLineOptionsGridLayout = new QGridLayout;
+  pOMCCommandLineOptionsGridLayout->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  pOMCCommandLineOptionsGridLayout->addWidget(mpOMCCommandLineOptionsLabel, 0, 0);
+  pOMCCommandLineOptionsGridLayout->addWidget(mpOMCCommandLineOptionsTextBox, 1, 0);
+  pOMCCommandLineOptionsWidget->setLayout(pOMCCommandLineOptionsGridLayout);
+  mpTabWidget->addTab(pOMCCommandLineOptionsWidget, Helper::OMCCommandLineOptions);
   // Create the buttons
   mpOkButton = new QPushButton(Helper::ok);
   mpOkButton->setAutoDefault(true);
   connect(mpOkButton, SIGNAL(clicked()), SLOT(saveGraphicsViewProperties()));
-  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary()) {
+  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() || mpGraphicsView->isVisualizationView()) {
     mpOkButton->setDisabled(true);
   }
   mpCancelButton = new QPushButton(Helper::cancel);
@@ -1433,8 +1434,8 @@ void GraphicsViewProperties::saveGraphicsViewProperties()
   UpdateCoOrdinateSystemCommand *pUpdateCoOrdinateSystemCommand;
   pUpdateCoOrdinateSystemCommand = new UpdateCoOrdinateSystemCommand(mpGraphicsView, oldCoOrdinateSystem, newCoOrdinateSystem,
                                                                      mpCopyProperties->isChecked(), oldVersion, mpVersionTextBox->text(),
-                                                                     oldUsesAnnotationString, newUsesAnnotationString, mOMCFlags,
-                                                                     mpOMCFlagsTextBox->toPlainText());
+                                                                     oldUsesAnnotationString, newUsesAnnotationString, mOMCCommandLineOptions,
+                                                                     mpOMCCommandLineOptionsTextBox->toPlainText());
   mpGraphicsView->getModelWidget()->getUndoStack()->push(pUpdateCoOrdinateSystemCommand);
   mpGraphicsView->getModelWidget()->updateModelText();
   if (OptionsDialog::instance()->getGeneralSettingsPage()->getPreserveUserCustomizations()) {
@@ -1846,6 +1847,10 @@ void RenameItemDialog::renameItem()
                             GUIMessages::ENTER_NAME).arg(Helper::item), Helper::ok);
     return;
   }
+  // if the name is same as old then simply return.
+  if (mpNameTextBox->text().compare(mpLibraryTreeItem->getName()) == 0) {
+    return;
+  }
   if (mpLibraryTreeItem->getLibraryType() == LibraryTreeItem::Text) {
     // check if file/folder already exists
     QFileInfo oldFileInfo(mpLibraryTreeItem->getFileName());
@@ -1880,6 +1885,13 @@ void RenameItemDialog::renameItem()
       mpLibraryTreeItem->getModelWidget()->getUndoStack()->push(pRenameCompositeModelCommand);
       mpLibraryTreeItem->getModelWidget()->updateModelText();
     }
+  } else if (mpLibraryTreeItem->getLibraryType() == LibraryTreeItem::OMS) {
+    if (!mpLibraryTreeItem->getModelWidget()) {
+      MainWindow::instance()->getLibraryWidget()->getLibraryTreeModel()->showModelWidget(mpLibraryTreeItem, false);
+    }
+    OMSRenameCommand *pOMSRenameCommand = new OMSRenameCommand(mpLibraryTreeItem, mpNameTextBox->text());
+    mpLibraryTreeItem->getModelWidget()->getUndoStack()->push(pOMSRenameCommand);
+    mpLibraryTreeItem->getModelWidget()->updateModelText();
   } else if (mpLibraryTreeItem->getLibraryType() == LibraryTreeItem::Modelica) {
     qDebug() << "Rename feature not implemented for Modelica library type.";
   } else {

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -36,6 +36,7 @@
 #define LINEANNOTATION_H
 
 #include "ShapeAnnotation.h"
+#include "OMSimulator.h"
 
 #include <QTreeView>
 #include <QSortFilterProxyModel>
@@ -125,9 +126,16 @@ public:
   QString getZfr() {return mZfr;}
   void setAlpha(QString alpha) {mAlpha = alpha;}
   QString getAlpha() {return mAlpha;}
+  void setOMSConnectionType(oms3_connection_type_enu_t connectionType) {mOMSConnectionType = connectionType;}
+  oms3_connection_type_enu_t getOMSConnectionType() {return mOMSConnectionType;}
+  void setActiveState(bool activeState) {mActiveState = activeState;}
+  bool isActiveState() {return mActiveState;}
   void setShapeFlags(bool enable);
   void updateShape(ShapeAnnotation *pShapeAnnotation);
   void setAligned(bool aligned);
+  void updateOMSConnection();
+  void updateToolTip();
+  void showOMSConnection();
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 
@@ -150,10 +158,12 @@ protected:
   QString mZf;
   QString mZfr;
   QString mAlpha;
+  oms3_connection_type_enu_t mOMSConnectionType;
+  bool mActiveState;
 public slots:
   void handleComponentMoved();
   void updateConnectionAnnotation();
-  void updateConnectionTransformation(QUndoCommand *pUndoCommand);
+  void updateConnectionTransformation();
   void updateTransitionAnnotation(QString oldCondition, bool oldImmediate, bool oldReset, bool oldSynchronize, int oldPriority);
   void updateInitialStateAnnotation();
   void duplicate();

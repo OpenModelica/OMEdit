@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -36,10 +36,9 @@
 #define OMCPROXY_H
 
 #include "OpenModelicaScriptingAPIQt.h"
-#include "Component/Component.h"
 #include "Util/StringHandler.h"
-#include "Util/Utilities.h"
 #include "Util/Helper.h"
+#include "Util/Utilities.h"
 
 class CustomExpressionBox;
 class ComponentInfo;
@@ -207,7 +206,7 @@ public:
   QString checkAllModelsRecursive(QString className);
   bool isExperiment(QString className);
   OMCInterface::getSimulationOptions_res getSimulationOptions(QString className, double defaultTolerance = 1e-6);
-  QString buildModelFMU(QString className, double version, QString type, QString fileNamePrefix, QList<QString> platforms, bool includeResources = true);
+  QString buildModelFMU(QString className, QString version, QString type, QString fileNamePrefix, QList<QString> platforms, bool includeResources = true);
   QString translateModelXML(QString className);
   QString importFMU(QString fmuName, QString outputDirectory, int logLevel, bool debugLogging, bool generateInputConnectors, bool generateOutputConnectors);
   QString importFMUModelDescription(QString fmuModelDescriptionName, QString outputDirectory, int logLevel, bool debugLogging, bool generateInputConnectors, bool generateOutputConnectors);
@@ -259,7 +258,7 @@ signals:
   void commandFinished();
 public slots:
   void logCommand(QString command, QTime *commandTime);
-  void logResponse(QString response, QTime *responseTime);
+  void logResponse(QString command, QString response, QTime *responseTime);
   void showException(QString exception);
   void openOMCLoggerWidget();
   void sendCustomExpression();

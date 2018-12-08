@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -36,7 +36,6 @@
 #include "Util/Helper.h"
 #include "MainWindow.h"
 #include "Options/OptionsDialog.h"
-#include "Modeling/ModelWidgetContainer.h"
 #include "ShapePropertiesDialog.h"
 #include "Modeling/Commands.h"
 #include "Component/ComponentProperties.h"
@@ -382,6 +381,7 @@ void ShapeAnnotation::setDefaults(ShapeAnnotation *pShapeAnnotation)
   mTextString = pShapeAnnotation->mTextString;
   mFontSize = pShapeAnnotation->mFontSize;
   mFontName = pShapeAnnotation->mFontName;
+  mTextStyles = pShapeAnnotation->mTextStyles;
   mHorizontalAlignment = pShapeAnnotation->mHorizontalAlignment;
   mOriginalFileName = mOriginalFileName;
   mFileName = pShapeAnnotation->mFileName;
@@ -975,11 +975,15 @@ void ShapeAnnotation::adjustGeometries()
   */
 void ShapeAnnotation::setShapeFlags(bool enable)
 {
-  /*
-    Only set the ItemIsMovable & ItemSendsGeometryChanges flags on shape if the class is not a system library class
-    AND shape is not an inherited shape.
-    */
-  if (!mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() && !isInheritedShape()) {
+  /* Only set the ItemIsMovable & ItemSendsGeometryChanges flags on shape if the class is not a system library class
+   * AND shape is not an inherited shape.
+   * AND shape is not a OMS connector i.e., input/output signals of fmu.
+   */
+  if (!mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() && !isInheritedShape()
+      && !(mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::OMS
+           && (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getOMSConnector()
+               || mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getOMSBusConnector()
+               || mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getOMSTLMBusConnector()))) {
     setFlag(QGraphicsItem::ItemIsMovable, enable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges, enable);
   }
@@ -1640,7 +1644,7 @@ void ShapeAnnotation::contextMenuEvent(QGraphicsSceneContextMenuEvent *pEvent)
 
     menu.addSeparator();
     menu.addAction(mpGraphicsView->getDeleteAction());
-  } else {
+  } else if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::Modelica) {
     menu.addAction(mpShapePropertiesAction);
     menu.addSeparator();
     if (isInheritedShape()) {
@@ -1676,6 +1680,14 @@ void ShapeAnnotation::contextMenuEvent(QGraphicsSceneContextMenuEvent *pEvent)
     } else if (lineType == LineAnnotation::TransitionType) {
       menu.addSeparator();
       menu.addAction(mpEditTransitionAction);
+    }
+  } else if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::OMS) {
+    BitmapAnnotation *pBitmapAnnotation = dynamic_cast<BitmapAnnotation*>(this);
+    if (pBitmapAnnotation && mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getOMSElement()) {
+      menu.addAction(MainWindow::instance()->getAddOrEditIconAction());
+      menu.addAction(MainWindow::instance()->getDeleteIconAction());
+    } else {
+      return;
     }
   }
   menu.exec(pEvent->screenPos());

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -478,6 +478,7 @@ namespace Utilities {
   float mini(float arr[], int n);
   QList<QPointF> liangBarskyClipper(float xmin, float ymin, float xmax, float ymax, float x1, float y1, float x2, float y2);
   void removeDirectoryRecursivly(QString path);
+  qreal mapToCoOrdinateSystem(qreal value, qreal startA, qreal endA, qreal startB, qreal endB);
 
 } // namespace Utilities
 

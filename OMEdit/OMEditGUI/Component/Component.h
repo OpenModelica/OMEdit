@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -46,6 +46,7 @@
 #include "Annotations/EllipseAnnotation.h"
 #include "Annotations/TextAnnotation.h"
 #include "Annotations/BitmapAnnotation.h"
+#include "OMS/OMSProxy.h"
 
 class OMCProxy;
 class GraphicsScene;
@@ -204,6 +205,7 @@ public:
   QAction* getOpenClassAction() {return mpOpenClassAction;}
   QAction* getViewDocumentationAction() {return mpViewDocumentationAction;}
   QAction* getSubModelAttributesAction() {return mpSubModelAttributesAction;}
+  QAction* getElementPropertiesAction() {return mpElementPropertiesAction;}
   ComponentInfo* getComponentInfo() {return mpComponentInfo;}
   QList<ShapeAnnotation*> getShapesList() {return mShapesList;}
   QList<Component*> getInheritedComponentsList() {return mInheritedComponentsList;}
@@ -224,12 +226,15 @@ public:
   void addConnectionDetails(LineAnnotation *pConnectorLineAnnotation);
   void removeConnectionDetails(LineAnnotation *pConnectorLineAnnotation);
   void setHasTransition(bool hasTransition);
+  bool hasTransition() {return mHasTransition;}
   void setIsInitialState(bool isInitialState);
+  bool isInitialState() {return mIsInitialState;}
+  void setActiveState(bool activeState) {mActiveState = activeState;}
+  bool isActiveState() {return mActiveState;}
   void removeChildren();
   void emitAdded();
   void emitTransformChange() {emit transformChange();}
   void emitTransformHasChanged();
-  void emitTransformChanging(QUndoCommand *pUndoCommand) {emit transformChanging(pUndoCommand);}
   void emitChanged();
   void emitDeleted();
   void componentParameterHasChanged();
@@ -241,6 +246,11 @@ public:
   void insertInterfacePoint(QString interfaceName, QString position, QString angle321, int dimensions, QString causality, QString domain);
   void removeInterfacePoint(QString interfaceName);
   void adjustInterfacePoints();
+  void updateComponentTransformations(const Transformation &oldTransformation);
+  void handleOMSComponentDoubleClick();
+  bool isInBus() {return mpBusComponent != 0;}
+  void setBusComponent(Component *pBusComponent);
+  Component* getBusComponent() {return mpBusComponent;}
 
   Transformation mTransformation;
   Transformation mOldTransformation;
@@ -267,6 +277,7 @@ private:
   QAction *mpOpenClassAction;
   QAction *mpViewDocumentationAction;
   QAction *mpSubModelAttributesAction;
+  QAction *mpElementPropertiesAction;
   ResizerItem *mpBottomLeftResizerItem;
   ResizerItem *mpTopLeftResizerItem;
   ResizerItem *mpTopRightResizerItem;
@@ -286,11 +297,15 @@ private:
   QPointF mOldPosition;
   bool mHasTransition;
   bool mIsInitialState;
+  bool mActiveState;
+  Component *mpBusComponent;
   void createNonExistingComponent();
   void createDefaultComponent();
   void createStateComponent();
   void drawInterfacePoints();
   void drawComponent();
+  void drawModelicaComponent();
+  void drawOMSComponent();
   void drawInheritedComponentsAndShapes();
   void showNonExistingOrDefaultComponentIfNeeded();
   void createClassInheritedComponents();
@@ -312,7 +327,7 @@ signals:
   void added();
   void transformChange();
   void transformHasChanged();
-  void transformChanging(QUndoCommand *pUndoCommand);
+  void transformChanging();
   void displayTextChanged();
   void changed();
   void deleted();
@@ -323,6 +338,7 @@ public slots:
   void handleUnloaded();
   void handleShapeAdded();
   void handleComponentAdded();
+  void handleNameChanged();
   void referenceComponentAdded();
   void referenceComponentTransformHasChanged();
   void referenceComponentChanged();
@@ -358,6 +374,8 @@ public slots:
   void openClass();
   void viewDocumentation();
   void showSubModelAttributes();
+  void showElementPropertiesDialog();
+  void updateDynamicSelect(double time);
 protected:
   virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event);
   virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value);

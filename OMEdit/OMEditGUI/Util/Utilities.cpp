@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -34,8 +34,10 @@
 
 #include "Utilities.h"
 #include "Helper.h"
+#include "StringHandler.h"
+#include "OMC/OMCProxy.h"
+#include "Modeling/ItemDelegate.h"
 #include "Editors/BaseEditor.h"
-#include "Modeling/LibraryTreeWidget.h"
 
 #include <QApplication>
 #include <QDesktopWidget>
@@ -44,6 +46,8 @@
 #include <QPainter>
 #include <QColorDialog>
 #include <QXmlSchema>
+#include <QXmlSchemaValidator>
+#include <QDir>
 
 SplashScreen *SplashScreen::mpInstance = 0;
 
@@ -1058,4 +1062,20 @@ void Utilities::removeDirectoryRecursivly(QString path)
   } else {
     QFile::remove(path);
   }
+}
+
+/*!
+ * \brief Utilities::mapToCoOrdinateSystem
+ * If you have numbers x in the range [a,b] and you want to transform them to numbers y in the range [c,d].\n
+ * y = ((x−a) * ((d−c)/(b−a))) + c
+ * \param value
+ * \param startA
+ * \param endA
+ * \param startB
+ * \param endB
+ * \return
+ */
+qreal Utilities::mapToCoOrdinateSystem(qreal value, qreal startA, qreal endA, qreal startB, qreal endB)
+{
+  return ((value - startA) * ((endB - startB) / (endA - startA))) + startB;
 }

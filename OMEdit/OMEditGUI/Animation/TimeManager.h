@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -37,7 +37,7 @@
 
 #include <cmath>
 
-#include <osg/Timer>
+#include <util/rtclock.h>
 
 #include <QTimer>
 
@@ -109,7 +109,7 @@ class TimeManager
   //! This variable indicates if the simulation/visualization currently pauses.
   bool _pause;
   double mSpeedUp;
-  osg::Timer _visualTimer;
+  rtclock_t _visualTimer;
   QTimer *mpUpdateSceneTimer;
 };
 

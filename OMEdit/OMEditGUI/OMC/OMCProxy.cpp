@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -54,6 +54,7 @@ void omc_Main_setWindowsPaths(threadData_t *threadData, void* _inOMHome);
 
 #include "OMCProxy.h"
 #include "MainWindow.h"
+#include "Component/Component.h"
 #include "Options/OptionsDialog.h"
 #include "Modeling/MessagesWidget.h"
 #include "simulation_options.h"
@@ -207,7 +208,7 @@ bool OMCProxy::initializeOMC(threadData_t *threadData)
   MMC_CATCH_TOP(return false;)
   mpOMCInterface = new OMCInterface(threadData);
   connect(mpOMCInterface, SIGNAL(logCommand(QString,QTime*)), this, SLOT(logCommand(QString,QTime*)));
-  connect(mpOMCInterface, SIGNAL(logResponse(QString,QTime*)), this, SLOT(logResponse(QString,QTime*)));
+  connect(mpOMCInterface, SIGNAL(logResponse(QString,QString,QTime*)), this, SLOT(logResponse(QString,QString,QTime*)));
   connect(mpOMCInterface, SIGNAL(throwException(QString)), SLOT(showException(QString)));
   mHasInitialized = true;
   // get OpenModelica version
@@ -272,7 +273,7 @@ void OMCProxy::sendCommand(const QString expression)
     exitApplication();
   }
   mResult = MMC_STRINGDATA(reply_str);
-  logResponse(mResult.trimmed(), &commandTime);
+  logResponse(expression, mResult.trimmed(), &commandTime);
 
   MMC_ELSE()
     mResult = "";
@@ -345,8 +346,17 @@ void OMCProxy::logCommand(QString command, QTime *commandTime)
  * \param response - the response to write
  * \param responseTime - the response end time
  */
-void OMCProxy::logResponse(QString response, QTime *responseTime)
+void OMCProxy::logResponse(QString command, QString response, QTime *responseTime)
 {
+  QString firstLine("");
+  for (int i = 0; i < command.length(); i++)
+    if (command[i] != '\n')
+    {
+      firstLine.append(command[i]);
+    }
+    else
+      break;
+
   if (isLoggingEnabled()) {
     // insert the response to the logger window.
     QFont font(Helper::monospacedFontInfo.family(), Helper::monospacedFontInfo.pointSize() - 2, QFont::Normal, false);
@@ -357,7 +367,7 @@ void OMCProxy::logResponse(QString response, QTime *responseTime)
     if (mpCommunicationLogFile) {
       fputs(QString("%1 %2\n").arg(response).arg(responseTime->currentTime().toString("hh:mm:ss:zzz")).toStdString().c_str(), mpCommunicationLogFile);
       mTotalOMCCallsTime += (double)responseTime->elapsed() / 1000;
-      fputs(QString("%1 secs (%2 secs)\n\n").arg(QString::number((double)responseTime->elapsed() / 1000)).arg(QString::number(mTotalOMCCallsTime)).toStdString().c_str(), mpCommunicationLogFile);
+      fputs(QString("#s#; %1; %2; \'%3\'\n\n").arg(QString::number((double)responseTime->elapsed() / 1000)).arg(QString::number(mTotalOMCCallsTime)).arg(firstLine).toStdString().c_str(),  mpCommunicationLogFile);
     }
   }
 }
@@ -2301,10 +2311,10 @@ OMCInterface::getSimulationOptions_res OMCProxy::getSimulationOptions(QString cl
  * \param platforms
  * \return
  */
-QString OMCProxy::buildModelFMU(QString className, double version, QString type, QString fileNamePrefix, QList<QString> platforms, bool includeResources)
+QString OMCProxy::buildModelFMU(QString className, QString version, QString type, QString fileNamePrefix, QList<QString> platforms, bool includeResources)
 {
   fileNamePrefix = fileNamePrefix.isEmpty() ? "<default>" : fileNamePrefix;
-  QString fmuFileName = mpOMCInterface->buildModelFMU(className, QString::number(version), type, fileNamePrefix, platforms, includeResources);
+  QString fmuFileName = mpOMCInterface->buildModelFMU(className, version, type, fileNamePrefix, platforms, includeResources);
   if (!fmuFileName.isEmpty()) {
     MainWindow::instance()->getLibraryWidget()->getLibraryTreeModel()->loadDependentLibraries(getClassNames());
   }
@@ -2445,7 +2455,7 @@ bool OMCProxy::setIndexReductionMethod(QString method)
 
 /*!
  * \brief OMCProxy::setCommandLineOptions
- * Sets the OMC flags.
+ * Sets the OMC CommandLineOptions.
  * \param options - a space separated list fo OMC command line options e.g. -d=initialization --cheapmatchingAlgorithm=3
  * \return true on success
  */
@@ -2460,7 +2470,7 @@ bool OMCProxy::setCommandLineOptions(QString options)
 
 /*!
  * \brief OMCProxy::clearCommandLineOptions
- * Clears the OMC flags.
+ * Clears the OMC CommandLineOptions.
  * \return true on success
  */
 bool OMCProxy::clearCommandLineOptions()

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -34,6 +34,7 @@
 
 #include "SimulationDialog.h"
 #include "MainWindow.h"
+#include "Modeling/ItemDelegate.h"
 #include "Options/OptionsDialog.h"
 #include "Modeling/MessagesWidget.h"
 #include "Debugger/GDB/GDBAdapter.h"
@@ -93,21 +94,20 @@ SimulationDialog::~SimulationDialog()
 
 /*!
  * \brief SimulationDialog::show
- * Reimplementation of QDialog::show method.
  * \param pLibraryTreeItem - pointer to LibraryTreeItem
  * \param isReSimulate
  * \param simulationOptions
  */
 void SimulationDialog::show(LibraryTreeItem *pLibraryTreeItem, bool isReSimulate, SimulationOptions simulationOptions)
 {
+  mpLibraryTreeItem = pLibraryTreeItem;
+  initializeFields(isReSimulate, simulationOptions);
+  setVisible(true);
   /* restore the window geometry. */
   if (OptionsDialog::instance()->getGeneralSettingsPage()->getPreserveUserCustomizations() &&
       Utilities::getApplicationSettings()->contains("SimulationDialog/geometry")) {
     restoreGeometry(Utilities::getApplicationSettings()->value("SimulationDialog/geometry").toByteArray());
   }
-  mpLibraryTreeItem = pLibraryTreeItem;
-  initializeFields(isReSimulate, simulationOptions);
-  setVisible(true);
 }
 
 /*!
@@ -190,10 +190,10 @@ void SimulationDialog::setUpForm()
   mpGeneralTabScrollArea->setWidget(mpGeneralTab);
   // Simulation Interval
   mpSimulationIntervalGroupBox = new QGroupBox(tr("Simulation Interval"));
-  mpStartTimeLabel = new Label(tr("Start Time:"));
-  mpStartTimeTextBox = new QLineEdit("0");
-  mpStopTimeLabel = new Label(tr("Stop Time:"));
-  mpStopTimeTextBox = new QLineEdit("1");
+  mpStartTimeLabel = new Label(QString("%1:").arg(Helper::startTime));
+  mpStartTimeTextBox = new QLineEdit;
+  mpStopTimeLabel = new Label(QString("%1:").arg(Helper::stopTime));
+  mpStopTimeTextBox = new QLineEdit;
   // Output Interval
   mpNumberofIntervalsRadioButton = new QRadioButton(tr("Number of Intervals:"));
   mpNumberofIntervalsRadioButton->setChecked(true);
@@ -201,11 +201,10 @@ void SimulationDialog::setUpForm()
   mpNumberofIntervalsSpinBox = new QSpinBox;
   mpNumberofIntervalsSpinBox->setRange(0, std::numeric_limits<int>::max());
   mpNumberofIntervalsSpinBox->setSingleStep(100);
-  mpNumberofIntervalsSpinBox->setValue(500);
   // Interval
   mpIntervalRadioButton = new QRadioButton(tr("Interval:"));
   connect(mpIntervalRadioButton, SIGNAL(toggled(bool)), SLOT(intervalRadioToggled(bool)));
-  mpIntervalTextBox = new QLineEdit("0.002");
+  mpIntervalTextBox = new QLineEdit;
   mpIntervalTextBox->setEnabled(false);
   // set the layout for simulation interval groupbox
   QGridLayout *pSimulationIntervalGridLayout = new QGridLayout;
@@ -225,14 +224,12 @@ void SimulationDialog::setUpForm()
   // interactive simulation
   mpInteractiveSimulationGroupBox = new QGroupBox(tr("Interactive Simulation"));
   mpInteractiveSimulationGroupBox->setCheckable(true);
-  mpInteractiveSimulationGroupBox->setChecked(false);
   mpInteractiveSimulationStepCheckBox = new QCheckBox(tr("Simulate with steps"));
   mpInteractiveSimulationStepCheckBox->setToolTip(tr("Activates communication with the simulation remote every time step.\n"
                                                      "Can cause high overhead but values will not be missed."));
   mpInteractiveSimulationPortLabel = new Label(tr("Simulation server port: "));
   mpInteractiveSimulationPortLabel->setToolTip(tr("Specifies the embedded server port."));
   mpInteractiveSimulationPortNumberTextBox = new QLineEdit;
-  mpInteractiveSimulationPortNumberTextBox->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Expanding);
   connect(mpInteractiveSimulationGroupBox, SIGNAL(toggled(bool)), SLOT(interactiveSimulation(bool)));
   // interactive simulation layout
   QGridLayout *pInteractiveSimulationLayout = new QGridLayout;
@@ -253,11 +250,6 @@ void SimulationDialog::setUpForm()
     mpMethodComboBox->setItemData(i, solverMethodsDesc.at(i), Qt::ToolTipRole);
   }
   connect(mpMethodComboBox, SIGNAL(currentIndexChanged(int)), SLOT(updateMethodToolTip(int)));
-  // make dassl default solver method.
-  int currentIndex = mpMethodComboBox->findText("dassl", Qt::MatchExactly);
-  if (currentIndex > -1) {
-    mpMethodComboBox->setCurrentIndex(currentIndex);
-  }
   connect(mpMethodComboBox, SIGNAL(currentIndexChanged(QString)), SLOT(enableDasslIdaOptions(QString)));
   mpMehtodHelpButton = new QToolButton;
   mpMehtodHelpButton->setIcon(QIcon(":/Resources/icons/link-external.svg"));
@@ -265,7 +257,7 @@ void SimulationDialog::setUpForm()
   connect(mpMehtodHelpButton, SIGNAL(clicked()), SLOT(showIntegrationHelp()));
   // Tolerance
   mpToleranceLabel = new Label(tr("Tolerance:"));
-  mpToleranceTextBox = new QLineEdit("1e-6");
+  mpToleranceTextBox = new QLineEdit;
   // jacobian
   mpJacobianLabel = new Label(tr("Jacobian:"));
   mpJacobianLabel->setToolTip(MainWindow::instance()->getOMCProxy()->getJacobianFlagDetailedDescription());
@@ -284,11 +276,9 @@ void SimulationDialog::setUpForm()
   // no root finding
   mpRootFindingCheckBox = new QCheckBox(tr("Root Finding"));
   mpRootFindingCheckBox->setToolTip(tr("Activates the internal root finding procedure of methods: dassl and ida."));
-  mpRootFindingCheckBox->setChecked(true);
   // no restart
   mpRestartAfterEventCheckBox = new QCheckBox(tr("Restart After Event"));
   mpRestartAfterEventCheckBox->setToolTip(tr("Activates the restart of the integration method after an event is performed, used by the methods: dassl, ida"));
-  mpRestartAfterEventCheckBox->setChecked(true);
   // initial step size
   mpInitialStepSizeLabel = new Label(tr("Initial Step Size:"));
   mpInitialStepSizeTextBox = new QLineEdit;
@@ -298,7 +288,6 @@ void SimulationDialog::setUpForm()
   // max integration order
   mpMaxIntegrationOrderLabel = new Label(tr("Maximum Integration Order:"));
   mpMaxIntegrationOrderSpinBox = new QSpinBox;
-  mpMaxIntegrationOrderSpinBox->setValue(5);
   // set the layout for DASSL/Ida options groupbox
   QGridLayout *pDasslIdaOptionsGridLayout = new QGridLayout;
   pDasslIdaOptionsGridLayout->setColumnStretch(1, 1);
@@ -331,7 +320,6 @@ void SimulationDialog::setUpForm()
   mpNumberOfProcessorsLabel = new Label(tr("Number of Processors:"));
   mpNumberOfProcessorsSpinBox = new QSpinBox;
   mpNumberOfProcessorsSpinBox->setMinimum(1);
-  mpNumberOfProcessorsSpinBox->setValue(MainWindow::instance()->getOMCProxy()->numProcessors());
   mpNumberOfProcessorsNoteLabel = new Label(tr("Use 1 processor if you encounter problems during compilation."));
   // build only
   mpBuildOnlyCheckBox = new QCheckBox(tr("Build Only"));
@@ -380,7 +368,7 @@ void SimulationDialog::setUpForm()
   mpResultFileNameLabel = new Label(tr("Result File (Optional):"));
   mpResultFileNameTextBox = new QLineEdit;
   mpResultFileName = new Label;
-  connect(mpResultFileNameTextBox, SIGNAL(textEdited(QString)), SLOT(resultFileNameChanged(QString)));
+  connect(mpFileNameTextBox, SIGNAL(textEdited(QString)), SLOT(resultFileNameChanged(QString)));
   connect(mpOutputFormatComboBox, SIGNAL(currentIndexChanged(QString)), SLOT(resultFileNameChanged(QString)));
   // Variable filter
   mpVariableFilterLabel = new Label(tr("Variable Filter (Optional):"));
@@ -389,29 +377,26 @@ void SimulationDialog::setUpForm()
   mpProtectedVariablesCheckBox = new QCheckBox(tr("Protected Variables"));
   // Equidistant time grid
   mpEquidistantTimeGridCheckBox = new QCheckBox(tr("Equidistant Time Grid"));
-  mpEquidistantTimeGridCheckBox->setChecked(true);
   // store variables at events
   mpStoreVariablesAtEventsCheckBox = new QCheckBox(tr("Store Variables at Events"));
-  mpStoreVariablesAtEventsCheckBox->setChecked(true);
   // show generated files checkbox
   mpShowGeneratedFilesCheckBox = new QCheckBox(tr("Show Generated Files"));
   // set Output Tab Layout
   QGridLayout *pOutputTabLayout = new QGridLayout;
   pOutputTabLayout->setAlignment(Qt::AlignTop);
   pOutputTabLayout->addWidget(mpOutputFormatLabel, 0, 0);
-  pOutputTabLayout->addWidget(mpOutputFormatComboBox, 0, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpSinglePrecisionCheckBox, 1, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpOutputFormatComboBox, 0, 1);
+  pOutputTabLayout->addWidget(mpSinglePrecisionCheckBox, 1, 0, 1, 2);
   pOutputTabLayout->addWidget(mpFileNameLabel, 2, 0);
-  pOutputTabLayout->addWidget(mpFileNameTextBox, 2, 1, 1, 2);
+  pOutputTabLayout->addWidget(mpFileNameTextBox, 2, 1);
   pOutputTabLayout->addWidget(mpResultFileNameLabel, 3, 0);
   pOutputTabLayout->addWidget(mpResultFileNameTextBox, 3, 1);
-  pOutputTabLayout->addWidget(mpResultFileName, 3, 2);
   pOutputTabLayout->addWidget(mpVariableFilterLabel, 4, 0);
-  pOutputTabLayout->addWidget(mpVariableFilterTextBox, 4, 1, 1, 2);
-  pOutputTabLayout->addWidget(mpProtectedVariablesCheckBox, 5, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpEquidistantTimeGridCheckBox, 6, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpStoreVariablesAtEventsCheckBox, 7, 0, 1, 3);
-  pOutputTabLayout->addWidget(mpShowGeneratedFilesCheckBox, 8, 0, 1, 3);
+  pOutputTabLayout->addWidget(mpVariableFilterTextBox, 4, 1);
+  pOutputTabLayout->addWidget(mpProtectedVariablesCheckBox, 5, 0, 1, 2);
+  pOutputTabLayout->addWidget(mpEquidistantTimeGridCheckBox, 6, 0, 1, 2);
+  pOutputTabLayout->addWidget(mpStoreVariablesAtEventsCheckBox, 7, 0, 1, 2);
+  pOutputTabLayout->addWidget(mpShowGeneratedFilesCheckBox, 8, 0, 1, 2);
   mpOutputTab->setLayout(pOutputTabLayout);
   // add Output Tab to Simulation TabWidget
   mpSimulationTabWidget->addTab(mpOutputTab, Helper::output);
@@ -505,7 +490,6 @@ void SimulationDialog::setUpForm()
   mpCPUTimeCheckBox = new QCheckBox(tr("CPU Time"));
   // enable all warnings
   mpEnableAllWarningsCheckBox = new QCheckBox(tr("Enable All Warnings"));
-  mpEnableAllWarningsCheckBox->setChecked(true);
   // Logging
   mpLoggingGroupBox = new QGroupBox(tr("Logging (Optional)"));
   // fetch the logging flags information
@@ -515,17 +499,17 @@ void SimulationDialog::setUpForm()
   mpLoggingGroupLayout = new QGridLayout;
   // create log stream checkboxes
   int row = 0;
+  int column = 0;
   for (int i = 0 ; i < logStreamNames.size() ; i++) {
     QCheckBox *pLogStreamCheckBox = new QCheckBox(logStreamNames[i]);
     pLogStreamCheckBox->setToolTip(logSteamDescriptions[i]);
-    // enable the stats logging by default
-    if (logStreamNames[i].compare("LOG_STATS") == 0) {
-      pLogStreamCheckBox->setChecked(true);
-    }
-    if (i % 2 == 0) {
-      mpLoggingGroupLayout->addWidget(pLogStreamCheckBox, row, 0);
-    } else {
-      mpLoggingGroupLayout->addWidget(pLogStreamCheckBox, row, 1);
+    if (column == 0) {
+      mpLoggingGroupLayout->addWidget(pLogStreamCheckBox, row, column++);
+    } else if (column == 1) {
+      mpLoggingGroupLayout->addWidget(pLogStreamCheckBox, row, column++);
+    } else if (column == 2) {
+      mpLoggingGroupLayout->addWidget(pLogStreamCheckBox, row, column);
+      column = 0;
       row++;
     }
   }
@@ -582,7 +566,7 @@ void SimulationDialog::setUpForm()
   mpArchivedSimulationsTreeWidget->setTextElideMode(Qt::ElideMiddle);
   mpArchivedSimulationsTreeWidget->setColumnCount(4);
   QStringList headers;
-  headers << tr("Class") << tr("DateTime") << tr("Start Time") << tr("Stop Time") << tr("Status");
+  headers << tr("Class") << Helper::dateTime << Helper::startTime << Helper::stopTime << Helper::status;
   mpArchivedSimulationsTreeWidget->setHeaderLabels(headers);
   mpArchivedSimulationsTreeWidget->setIndentation(0);
   connect(mpArchivedSimulationsTreeWidget, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), SLOT(showArchivedSimulation(QTreeWidgetItem*)));
@@ -591,7 +575,7 @@ void SimulationDialog::setUpForm()
   pArchivedSimulationsTabLayout->addWidget(mpArchivedSimulationsTreeWidget, 0, 0);
   mpArchivedSimulationsTab->setLayout(pArchivedSimulationsTabLayout);
   // add Archived simulations Tab to Simulation TabWidget
-  mpSimulationTabWidget->addTab(mpArchivedSimulationsTab, tr("Archived Simulations"));
+  mpSimulationTabWidget->addTab(mpArchivedSimulationsTab, Helper::archivedSimulations);
   // Add the validators
   QDoubleValidator *pDoubleValidator = new QDoubleValidator(this);
   mpStartTimeTextBox->setValidator(pDoubleValidator);
@@ -662,242 +646,283 @@ void SimulationDialog::initializeFields(bool isReSimulate, SimulationOptions sim
     mFileName = mpLibraryTreeItem->getFileName();
     setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::simulationSetup).append(" - ").append(mClassName));
     mpSimulationHeading->setText(QString(Helper::simulationSetup).append(" - ").append(mClassName));
-    // if the class has experiment annotation then read it.
-    if (MainWindow::instance()->getOMCProxy()->isExperiment(mClassName)) {
-      // get the simulation options....
-      OMCInterface::getSimulationOptions_res simulationOptions = MainWindow::instance()->getOMCProxy()->getSimulationOptions(mClassName);
-      // since we always get simulationOptions so just get the values from array
-      mpStartTimeTextBox->setText(QString::number(simulationOptions.startTime));
-      mpStopTimeTextBox->setText(QString::number(simulationOptions.stopTime));
-      mpToleranceTextBox->setText(QString::number(simulationOptions.tolerance));
-      mpNumberofIntervalsSpinBox->setValue(simulationOptions.numberOfIntervals);
-      mpIntervalTextBox->setText(QString::number(simulationOptions.interval));
-    }
-    // if ignoreSimulationFlagsAnnotation flag is not set then read the __OpenModelica_simulationFlags annotation
-    if (!OptionsDialog::instance()->getSimulationPage()->getIgnoreSimulationFlagsAnnotationCheckBox()->isChecked()) {
-      QMap<QString, QString> additionalSimulationFlags;
-      // if the class has __OpenModelica_simulationFlags annotation then use its values.
-      QList<QString> simulationFlags = MainWindow::instance()->getOMCProxy()->getAnnotationNamedModifiers(mClassName, "__OpenModelica_simulationFlags");
-      foreach (QString simulationFlag, simulationFlags) {
-        QString value = MainWindow::instance()->getOMCProxy()->getAnnotationModifierValue(mClassName, "__OpenModelica_simulationFlags", simulationFlag);
-        if (simulationFlag.compare("clock") == 0) {
-          mpClockComboBox->setCurrentIndex(mpClockComboBox->findText(value));
-        } else if (simulationFlag.compare("cpu") == 0) {
-          mpCPUTimeCheckBox->setChecked(true);
-        } else if (simulationFlag.compare("noRestart") == 0) {
-          mpRestartAfterEventCheckBox->setChecked(false);
-        } else if (simulationFlag.compare("noRootFinding") == 0) {
-          mpRootFindingCheckBox->setChecked(false);
-        } else if (simulationFlag.compare("single") == 0) {
-          mpSinglePrecisionCheckBox->setChecked(true);
-        } else if (simulationFlag.compare("emit_protected") == 0) {
-          mpProtectedVariablesCheckBox->setChecked(true);
-        } else if (simulationFlag.compare("f") == 0) {
-          mpModelSetupFileTextBox->setText(value);
-        } else if (simulationFlag.compare("iif") == 0) {
-          mpEquationSystemInitializationFileTextBox->setText(value);
-        } else if (simulationFlag.compare("iim") == 0) {
-          mpInitializationMethodComboBox->setCurrentIndex(mpInitializationMethodComboBox->findText(value));
-        } else if (simulationFlag.compare("iit") == 0) {
-          mpEquationSystemInitializationTimeTextBox->setText(value);
-        } else if (simulationFlag.compare("initialStepSize") == 0) {
-          mpInitialStepSizeTextBox->setText(value);
-        } else if (simulationFlag.compare("jacobian") == 0) {
-          mpJacobianComboBox->setCurrentIndex(mpJacobianComboBox->findText(value));
-        } else if (simulationFlag.compare("l") == 0) {
-          mpLinearizationTimeTextBox->setText(value);
-        } else if (simulationFlag.compare("ls") == 0) {
-          mpLinearSolverComboBox->setCurrentIndex(mpLinearSolverComboBox->findText(value));
-        } else if (simulationFlag.compare("maxIntegrationOrder") == 0) {
-          mpMaxIntegrationOrderSpinBox->setValue(value.toInt());
-        } else if (simulationFlag.compare("maxStepSize") == 0) {
-          mpMaxStepSizeTextBox->setText(value);
-        } else if (simulationFlag.compare("nls") == 0) {
-          mpNonLinearSolverComboBox->setCurrentIndex(mpNonLinearSolverComboBox->findText(value));
-        } else if (simulationFlag.compare("noEquidistantTimeGrid") == 0) {
-          mpEquidistantTimeGridCheckBox->setChecked(false);
-        } else if (simulationFlag.compare("noEventEmit") == 0) {
-          mpStoreVariablesAtEventsCheckBox->setChecked(false);
-        } else if (simulationFlag.compare("output") == 0) {
-          mpOutputVariablesTextBox->setText(value);
-        } else if (simulationFlag.compare("r") == 0) {
-          mpResultFileName->setText(value);
-        } else if (simulationFlag.compare("s") == 0) {
-          mpMethodComboBox->setCurrentIndex(mpMethodComboBox->findText(value));
-        } else if (simulationFlag.compare("lv") == 0) {
-          QStringList logStreams = value.split(",", QString::SkipEmptyParts);
-          int i = 0;
-          while (QLayoutItem* pLayoutItem = mpLoggingGroupLayout->itemAt(i)) {
-            if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
-              QCheckBox *pLogStreamCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
-              if (logStreams.contains(pLogStreamCheckBox->text())) {
-                pLogStreamCheckBox->setChecked(true);
+    // apply simulation options
+    mpLibraryTreeItem->mSimulationOptions.setClassName(mClassName);
+    applySimulationOptions(mpLibraryTreeItem->mSimulationOptions);
+    /* Fix for ticket:4975
+     * If SimulationOptions is invalid it means we are going to simulate this class for the first time.
+     * So in that case read the experiment and __OpenModelica_simulationFlags annotations and apply them on top of the default.
+     * If SimulationOptions is valid that means we already simulated that class and in that case we applied the options last time set
+     * by the user.
+     */
+    if (!mpLibraryTreeItem->mSimulationOptions.isValid()) {
+      // if the class has experiment annotation then read it.
+      if (MainWindow::instance()->getOMCProxy()->isExperiment(mClassName)) {
+        // get the simulation options....
+        OMCInterface::getSimulationOptions_res simulationOptions = MainWindow::instance()->getOMCProxy()->getSimulationOptions(mClassName);
+        // since we always get simulationOptions so just get the values from array
+        mpStartTimeTextBox->setText(QString::number(simulationOptions.startTime));
+        mpStopTimeTextBox->setText(QString::number(simulationOptions.stopTime));
+        mpToleranceTextBox->setText(QString::number(simulationOptions.tolerance));
+        mpNumberofIntervalsSpinBox->setValue(simulationOptions.numberOfIntervals);
+        mpIntervalTextBox->setText(QString::number(simulationOptions.interval));
+      }
+      // if ignoreSimulationFlagsAnnotation flag is not set then read the __OpenModelica_simulationFlags annotation
+      if (!OptionsDialog::instance()->getSimulationPage()->getIgnoreSimulationFlagsAnnotationCheckBox()->isChecked()) {
+        QMap<QString, QString> additionalSimulationFlags;
+        // if the class has __OpenModelica_simulationFlags annotation then use its values.
+        QList<QString> simulationFlags = MainWindow::instance()->getOMCProxy()->getAnnotationNamedModifiers(mClassName, "__OpenModelica_simulationFlags");
+        foreach (QString simulationFlag, simulationFlags) {
+          QString value = MainWindow::instance()->getOMCProxy()->getAnnotationModifierValue(mClassName, "__OpenModelica_simulationFlags", simulationFlag);
+          if (simulationFlag.compare("clock") == 0) {
+            mpClockComboBox->setCurrentIndex(mpClockComboBox->findText(value));
+          } else if (simulationFlag.compare("cpu") == 0) {
+            mpCPUTimeCheckBox->setChecked(true);
+          } else if (simulationFlag.compare("noRestart") == 0) {
+            mpRestartAfterEventCheckBox->setChecked(false);
+          } else if (simulationFlag.compare("noRootFinding") == 0) {
+            mpRootFindingCheckBox->setChecked(false);
+          } else if (simulationFlag.compare("outputFormat") == 0) {
+            mpOutputFormatComboBox->setCurrentIndex(mpOutputFormatComboBox->findText(value));
+          } else if (simulationFlag.compare("single") == 0) {
+            mpSinglePrecisionCheckBox->setChecked(true);
+          } else if (simulationFlag.compare("emit_protected") == 0) {
+            mpProtectedVariablesCheckBox->setChecked(true);
+          } else if (simulationFlag.compare("f") == 0) {
+            mpModelSetupFileTextBox->setText(value);
+          } else if (simulationFlag.compare("iif") == 0) {
+            mpEquationSystemInitializationFileTextBox->setText(value);
+          } else if (simulationFlag.compare("iim") == 0) {
+            mpInitializationMethodComboBox->setCurrentIndex(mpInitializationMethodComboBox->findText(value));
+          } else if (simulationFlag.compare("iit") == 0) {
+            mpEquationSystemInitializationTimeTextBox->setText(value);
+          } else if (simulationFlag.compare("initialStepSize") == 0) {
+            mpInitialStepSizeTextBox->setText(value);
+          } else if (simulationFlag.compare("jacobian") == 0) {
+            mpJacobianComboBox->setCurrentIndex(mpJacobianComboBox->findText(value));
+          } else if (simulationFlag.compare("l") == 0) {
+            mpLinearizationTimeTextBox->setText(value);
+          } else if (simulationFlag.compare("ls") == 0) {
+            mpLinearSolverComboBox->setCurrentIndex(mpLinearSolverComboBox->findText(value));
+          } else if (simulationFlag.compare("maxIntegrationOrder") == 0) {
+            mpMaxIntegrationOrderSpinBox->setValue(value.toInt());
+          } else if (simulationFlag.compare("maxStepSize") == 0) {
+            mpMaxStepSizeTextBox->setText(value);
+          } else if (simulationFlag.compare("nls") == 0) {
+            mpNonLinearSolverComboBox->setCurrentIndex(mpNonLinearSolverComboBox->findText(value));
+          } else if (simulationFlag.compare("noEquidistantTimeGrid") == 0) {
+            mpEquidistantTimeGridCheckBox->setChecked(false);
+          } else if (simulationFlag.compare("noEventEmit") == 0) {
+            mpStoreVariablesAtEventsCheckBox->setChecked(false);
+          } else if (simulationFlag.compare("output") == 0) {
+            mpOutputVariablesTextBox->setText(value);
+          } else if (simulationFlag.compare("r") == 0) {
+            mpResultFileNameTextBox->setText(value);
+            mpResultFileName->setText(value);
+          } else if (simulationFlag.compare("s") == 0) {
+            mpMethodComboBox->setCurrentIndex(mpMethodComboBox->findText(value));
+          } else if (simulationFlag.compare("lv") == 0) {
+            QStringList logStreams = value.split(",", QString::SkipEmptyParts);
+            int i = 0;
+            while (QLayoutItem* pLayoutItem = mpLoggingGroupLayout->itemAt(i)) {
+              if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
+                QCheckBox *pLogStreamCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
+                if (logStreams.contains(pLogStreamCheckBox->text())) {
+                  pLogStreamCheckBox->setChecked(true);
+                }
               }
+              i++;
             }
-            i++;
+          } else { // put everything else in the Additional Simulation Flags textbox
+            additionalSimulationFlags.insert(simulationFlag, value);
           }
-        } else { // put everything else in the Additional Simulation Flags textbox
-          additionalSimulationFlags.insert(simulationFlag, value);
         }
-      }
-      QStringList additionalSimulationFlagsList;
-      QMapIterator<QString, QString> additionalSimulationFlagsIterator(additionalSimulationFlags);
-      additionalSimulationFlagsIterator.toFront();
-      while (additionalSimulationFlagsIterator.hasNext()) {
-        additionalSimulationFlagsIterator.next();
-        if (additionalSimulationFlagsIterator.value().compare("()") == 0) {
-          additionalSimulationFlagsList.append(QString("-%1").arg(additionalSimulationFlagsIterator.key()));
-        } else {
-          additionalSimulationFlagsList.append(QString("-%1=%2")
-                                               .arg(additionalSimulationFlagsIterator.key())
-                                               .arg(additionalSimulationFlagsIterator.value()));
+        QStringList additionalSimulationFlagsList;
+        QMapIterator<QString, QString> additionalSimulationFlagsIterator(additionalSimulationFlags);
+        additionalSimulationFlagsIterator.toFront();
+        while (additionalSimulationFlagsIterator.hasNext()) {
+          additionalSimulationFlagsIterator.next();
+          if (additionalSimulationFlagsIterator.value().compare("()") == 0) {
+            additionalSimulationFlagsList.append(QString("-%1").arg(additionalSimulationFlagsIterator.key()));
+          } else {
+            additionalSimulationFlagsList.append(QString("-%1=%2")
+                                                 .arg(additionalSimulationFlagsIterator.key())
+                                                 .arg(additionalSimulationFlagsIterator.value()));
+          }
         }
+        mpAdditionalSimulationFlagsTextBox->setText(additionalSimulationFlagsList.join(" "));
       }
-      mpAdditionalSimulationFlagsTextBox->setText(additionalSimulationFlagsList.join(" "));
     }
     mpCflagsTextBox->setEnabled(true);
     mpFileNameTextBox->setEnabled(true);
     mpSaveExperimentAnnotationCheckBox->setVisible(true);
     mpSaveSimulationFlagsAnnotationCheckBox->setVisible(true);
     mpSimulateCheckBox->setVisible(true);
-    // interactive simulation, allow free port specification
-    mpInteractiveSimulationPortNumberTextBox->clear();
-    mpInteractiveSimulationPortNumberTextBox->setEnabled(true);
   } else {
     mIsReSimulate = true;
     mClassName = simulationOptions.getClassName();
     mFileName = simulationOptions.getFileName();
     setWindowTitle(QString(Helper::applicationName).append(" - ").append(Helper::reSimulation).append(" - ").append(mClassName));
     mpSimulationHeading->setText(QString(Helper::reSimulation).append(" - ").append(mClassName));
-    // Simulation Interval
-    mpStartTimeTextBox->setText(simulationOptions.getStartTime());
-    mpStopTimeTextBox->setText(simulationOptions.getStopTime());
-    // Integration
-    int currentIndex = mpMethodComboBox->findText(simulationOptions.getMethod(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpMethodComboBox->setCurrentIndex(currentIndex);
-    }
-    // Tolerance
-    mpToleranceTextBox->setText(simulationOptions.getTolerance());
-    // dassl jacobian
-    currentIndex = mpJacobianComboBox->findText(simulationOptions.getJacobian(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpJacobianComboBox->setCurrentIndex(currentIndex);
-    }
-    // no root finding
-    mpRootFindingCheckBox->setChecked(simulationOptions.getRootFinding());
-    // no restart
-    mpRestartAfterEventCheckBox->setChecked(simulationOptions.getRestartAfterEvent());
-    // initial step size
-    mpInitialStepSizeTextBox->setText(simulationOptions.getInitialStepSize());
-    // max step size
-    mpMaxStepSizeTextBox->setText(simulationOptions.getMaxStepSize());
-    // max integration order
-    mpMaxIntegrationOrderSpinBox->setValue(simulationOptions.getMaxIntegration());
-    // Compiler Flags
+    // apply simulation options
+    applySimulationOptions(simulationOptions);
+    mpInteractiveSimulationGroupBox->setChecked(false);
+    mpInteractiveSimulationGroupBox->setEnabled(false);
     mpCflagsTextBox->setDisabled(true);
-    // Number of Processors
-    mpNumberOfProcessorsSpinBox->setValue(simulationOptions.getNumberOfProcessors());
-    // Launch Transformational Debugger checkbox
-    mpLaunchTransformationalDebuggerCheckBox->setChecked(simulationOptions.getLaunchTransformationalDebugger());
-    // Launch Algorithmic Debugger checkbox
-    mpLaunchAlgorithmicDebuggerCheckBox->setChecked(simulationOptions.getLaunchAlgorithmicDebugger());
-#if !defined(WITHOUT_OSG)
-    // Simulate with Animation checkbox
-    mpLaunchAnimationCheckBox->setChecked(simulationOptions.getSimulateWithAnimation());
-#endif
-    // build only
-    mpBuildOnlyCheckBox->setChecked(simulationOptions.getBuildOnly());
-    // Number Of Intervals
-    mpNumberofIntervalsSpinBox->setValue(simulationOptions.getNumberofIntervals());
-    // Interval
-    mpIntervalTextBox->setText(QString::number(simulationOptions.getStepSize()));
-    // output format
-    bool state = mpOutputFormatComboBox->blockSignals(true);
-    currentIndex = mpOutputFormatComboBox->findText(simulationOptions.getOutputFormat(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpOutputFormatComboBox->setCurrentIndex(currentIndex);
-    }
-    mpOutputFormatComboBox->blockSignals(state);
-    // single precision
-    mpSinglePrecisionCheckBox->setChecked(simulationOptions.getSinglePrecision());
-    mpSinglePrecisionCheckBox->setEnabled(mpOutputFormatComboBox->currentText().compare("mat") == 0);
-    // Output filename
     mpFileNameTextBox->setDisabled(true);
-    // Variable filter
-    mpVariableFilterTextBox->setText(simulationOptions.getVariableFilter());
-    // Protected Variabels
-    mpProtectedVariablesCheckBox->setChecked(simulationOptions.getProtectedVariables());
-    // Equidistant time grid
-    mpEquidistantTimeGridCheckBox->setChecked(simulationOptions.getEquidistantTimeGrid());
-    // store variables at events
-    mpStoreVariablesAtEventsCheckBox->setChecked(simulationOptions.getStoreVariablesAtEvents());
-    // show generated files checkbox
-    mpShowGeneratedFilesCheckBox->setChecked(simulationOptions.getShowGeneratedFiles());
-    // Model Setup File
-    mpModelSetupFileTextBox->setText(simulationOptions.getModelSetupFile());
-    // Initialization Methods
-    mpInitializationMethodLabel = new Label(tr("Initialization Method (Optional):"));
-    mpInitializationMethodLabel->setToolTip(tr("Specifies the initialization method."));
-    currentIndex = mpInitializationMethodComboBox->findText(simulationOptions.getInitializationMethod(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpInitializationMethodComboBox->setCurrentIndex(currentIndex);
-    }
-    // Equation System Initialization File
-    mpEquationSystemInitializationFileTextBox->setText(simulationOptions.getEquationSystemInitializationFile());
-    // Equation System time
-    mpEquationSystemInitializationTimeTextBox->setText(simulationOptions.getEquationSystemInitializationTime());
-    // clock
-    currentIndex = mpClockComboBox->findText(simulationOptions.getClock(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpClockComboBox->setCurrentIndex(currentIndex);
-    }
-    // Linear Solvers
-    currentIndex = mpLinearSolverComboBox->findText(simulationOptions.getLinearSolver(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpLinearSolverComboBox->setCurrentIndex(currentIndex);
-    }
-    // Non Linear Solvers
-    currentIndex = mpNonLinearSolverComboBox->findText(simulationOptions.getNonLinearSolver(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpNonLinearSolverComboBox->setCurrentIndex(currentIndex);
-    }
-    // time where the linearization of the model should be performed
-    mpLinearizationTimeTextBox->setText(simulationOptions.getLinearizationTime());
-    // output variables
-    mpOutputVariablesTextBox->setText(simulationOptions.getOutputVariables());
-    // measure simulation time checkbox
-    currentIndex = mpProfilingComboBox->findText(simulationOptions.getProfiling(), Qt::MatchExactly);
-    if (currentIndex > -1) {
-      mpProfilingComboBox->setCurrentIndex(currentIndex);
-    }
-    // cpu-time checkbox
-    mpCPUTimeCheckBox->setChecked(simulationOptions.getCPUTime());
-    // enable all warnings
-    mpEnableAllWarningsCheckBox->setChecked(simulationOptions.getEnableAllWarnings());
-    // Logging
-    QStringList logStreams = simulationOptions.getLogStreams();
-    int i = 0;
-    while (QLayoutItem* pLayoutItem = mpLoggingGroupLayout->itemAt(i)) {
-      if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
-        QCheckBox *pLogStreamCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
-        if (logStreams.contains(pLogStreamCheckBox->text())) {
-          pLogStreamCheckBox->setChecked(true);
-        } else {
-          pLogStreamCheckBox->setChecked(false);
-        }
-      }
-      i++;
-    }
-    mpAdditionalSimulationFlagsTextBox->setText(simulationOptions.getAdditionalSimulationFlags());
     // save simulation settings
     mpSaveExperimentAnnotationCheckBox->setVisible(false);
     mpSaveSimulationFlagsAnnotationCheckBox->setVisible(false);
     mpSimulateCheckBox->setVisible(false);
-    // interactive simulation, use the same port for a re-simulation
-    mpInteractiveSimulationPortNumberTextBox->setText(QString::number(simulationOptions.getInteractiveSimulationPortNumber()));
-    mpInteractiveSimulationPortNumberTextBox->setEnabled(false);
   }
+}
+
+/*!
+ * \brief SimulationDialog::applySimulationOptions
+ * Apply the simulation options to the SimulationDialog.
+ * \param simulationOptions
+ */
+void SimulationDialog::applySimulationOptions(SimulationOptions simulationOptions)
+{
+  // Simulation Interval
+  mpStartTimeTextBox->setText(simulationOptions.getStartTime());
+  mpStopTimeTextBox->setText(simulationOptions.getStopTime());
+  // Integration
+  int currentIndex = mpMethodComboBox->findText(simulationOptions.getMethod(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpMethodComboBox->setCurrentIndex(currentIndex);
+  }
+  // Tolerance
+  mpToleranceTextBox->setText(simulationOptions.getTolerance());
+  // dassl jacobian
+  currentIndex = mpJacobianComboBox->findText(simulationOptions.getJacobian(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpJacobianComboBox->setCurrentIndex(currentIndex);
+  }
+  // no root finding
+  mpRootFindingCheckBox->setChecked(simulationOptions.getRootFinding());
+  // no restart
+  mpRestartAfterEventCheckBox->setChecked(simulationOptions.getRestartAfterEvent());
+  // initial step size
+  mpInitialStepSizeTextBox->setText(simulationOptions.getInitialStepSize());
+  // max step size
+  mpMaxStepSizeTextBox->setText(simulationOptions.getMaxStepSize());
+  // max integration order
+  mpMaxIntegrationOrderSpinBox->setValue(simulationOptions.getMaxIntegration());
+  // Compiler Flags
+  mpCflagsTextBox->setText(simulationOptions.getCflags());
+  // Number of Processors
+  mpNumberOfProcessorsSpinBox->setValue(simulationOptions.getNumberOfProcessors());
+  // Launch Transformational Debugger checkbox
+  mpLaunchTransformationalDebuggerCheckBox->setChecked(simulationOptions.getLaunchTransformationalDebugger());
+  // Launch Algorithmic Debugger checkbox
+  mpLaunchAlgorithmicDebuggerCheckBox->setChecked(simulationOptions.getLaunchAlgorithmicDebugger());
+#if !defined(WITHOUT_OSG)
+  // Simulate with Animation checkbox
+  mpLaunchAnimationCheckBox->setChecked(simulationOptions.getSimulateWithAnimation());
+#endif
+  // build only
+  mpBuildOnlyCheckBox->setChecked(simulationOptions.getBuildOnly());
+  // Number Of Intervals
+  mpNumberofIntervalsSpinBox->setValue(simulationOptions.getNumberofIntervals());
+  // Interval
+  mpIntervalTextBox->setText(QString::number(simulationOptions.getStepSize()));
+  // Interactive simulation
+  QString targetLanguage = OptionsDialog::instance()->getSimulationPage()->getTargetLanguageComboBox()->currentText();
+  if (targetLanguage.compare("C") == 0) {
+    mpInteractiveSimulationGroupBox->setEnabled(true);
+    mpInteractiveSimulationGroupBox->setChecked(simulationOptions.isInteractiveSimulation());
+    mpInteractiveSimulationPortNumberTextBox->setText(QString::number(simulationOptions.getInteractiveSimulationPortNumber()));
+    mpInteractiveSimulationStepCheckBox->setChecked(simulationOptions.isInteractiveSimulationWithSteps());
+  } else {
+    mpInteractiveSimulationGroupBox->setChecked(false);
+    mpInteractiveSimulationGroupBox->setEnabled(false);
+  }
+  // output format
+  bool state = mpOutputFormatComboBox->blockSignals(true);
+  currentIndex = mpOutputFormatComboBox->findText(simulationOptions.getOutputFormat(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpOutputFormatComboBox->setCurrentIndex(currentIndex);
+  }
+  mpOutputFormatComboBox->blockSignals(state);
+  // single precision
+  mpSinglePrecisionCheckBox->setChecked(simulationOptions.getSinglePrecision());
+  mpSinglePrecisionCheckBox->setEnabled(mpOutputFormatComboBox->currentText().compare("mat") == 0);
+  // Output filename
+  if (simulationOptions.getFileNamePrefix().startsWith("_omcQuot_")) {
+    mpFileNameTextBox->setText(QByteArray::fromHex(QByteArray(simulationOptions.getFileNamePrefix().toStdString().c_str())));
+  } else {
+    mpFileNameTextBox->setText(simulationOptions.getFileNamePrefix());
+  }
+  // Result filename
+  mpResultFileNameTextBox->setPlaceholderText(QString("%1_res.%2").arg(mClassName, simulationOptions.getOutputFormat()));
+  if (!simulationOptions.isInteractiveSimulation()) {
+    mpResultFileNameTextBox->setText(simulationOptions.getResultFileName());
+  }
+  // Variable filter
+  mpVariableFilterTextBox->setText(simulationOptions.getVariableFilter());
+  // Protected Variabels
+  mpProtectedVariablesCheckBox->setChecked(simulationOptions.getProtectedVariables());
+  // Equidistant time grid
+  mpEquidistantTimeGridCheckBox->setChecked(simulationOptions.getEquidistantTimeGrid());
+  // store variables at events
+  mpStoreVariablesAtEventsCheckBox->setChecked(simulationOptions.getStoreVariablesAtEvents());
+  // show generated files checkbox
+  mpShowGeneratedFilesCheckBox->setChecked(simulationOptions.getShowGeneratedFiles());
+  // Model Setup File
+  mpModelSetupFileTextBox->setText(simulationOptions.getModelSetupFile());
+  // Initialization Methods
+  currentIndex = mpInitializationMethodComboBox->findText(simulationOptions.getInitializationMethod(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpInitializationMethodComboBox->setCurrentIndex(currentIndex);
+  }
+  // Equation System Initialization File
+  mpEquationSystemInitializationFileTextBox->setText(simulationOptions.getEquationSystemInitializationFile());
+  // Equation System time
+  mpEquationSystemInitializationTimeTextBox->setText(simulationOptions.getEquationSystemInitializationTime());
+  // clock
+  currentIndex = mpClockComboBox->findText(simulationOptions.getClock(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpClockComboBox->setCurrentIndex(currentIndex);
+  }
+  // Linear Solvers
+  currentIndex = mpLinearSolverComboBox->findText(simulationOptions.getLinearSolver(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpLinearSolverComboBox->setCurrentIndex(currentIndex);
+  }
+  // Non Linear Solvers
+  currentIndex = mpNonLinearSolverComboBox->findText(simulationOptions.getNonLinearSolver(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpNonLinearSolverComboBox->setCurrentIndex(currentIndex);
+  }
+  // time where the linearization of the model should be performed
+  mpLinearizationTimeTextBox->setText(simulationOptions.getLinearizationTime());
+  // output variables
+  mpOutputVariablesTextBox->setText(simulationOptions.getOutputVariables());
+  // measure simulation time checkbox
+  currentIndex = mpProfilingComboBox->findText(simulationOptions.getProfiling(), Qt::MatchExactly);
+  if (currentIndex > -1) {
+    mpProfilingComboBox->setCurrentIndex(currentIndex);
+  }
+  // cpu-time checkbox
+  mpCPUTimeCheckBox->setChecked(simulationOptions.getCPUTime());
+  // enable all warnings
+  mpEnableAllWarningsCheckBox->setChecked(simulationOptions.getEnableAllWarnings());
+  // Logging
+  QStringList logStreams = simulationOptions.getLogStreams();
+  int i = 0;
+  while (QLayoutItem* pLayoutItem = mpLoggingGroupLayout->itemAt(i)) {
+    if (dynamic_cast<QCheckBox*>(pLayoutItem->widget())) {
+      QCheckBox *pLogStreamCheckBox = dynamic_cast<QCheckBox*>(pLayoutItem->widget());
+      if (logStreams.contains(pLogStreamCheckBox->text())) {
+        pLogStreamCheckBox->setChecked(true);
+      } else {
+        pLogStreamCheckBox->setChecked(false);
+      }
+    }
+    i++;
+  }
+  mpAdditionalSimulationFlagsTextBox->setText(simulationOptions.getAdditionalSimulationFlags());
 }
 
 /*!
@@ -989,7 +1014,9 @@ SimulationOptions SimulationDialog::createSimulationOptions()
   }
   // result file should not be generated if an interactive simulation is selected
   if (!mpInteractiveSimulationGroupBox->isChecked()) {
-    simulationOptions.setResultFileName(mpResultFileName->text());
+    if (!mpResultFileNameTextBox->text().isEmpty()) {
+      simulationOptions.setResultFileName(mpResultFileNameTextBox->text());
+    }
   } else {
     // set an invalid result file name to avoid interactive simulations to destroy previous results
     simulationOptions.setResultFileName(QString(mClassName + "_res.int"));
@@ -1046,7 +1073,7 @@ SimulationOptions SimulationDialog::createSimulationOptions()
                          .arg("solver").arg(simulationOptions.getMethod())
                          .arg("outputFormat").arg(simulationOptions.getOutputFormat())
                          .arg("variableFilter").arg(simulationOptions.getVariableFilter()));
-  simulationFlags.append(QString("-r=%1/%2").arg(simulationOptions.getWorkingDirectory(), simulationOptions.getResultFileName()));
+  simulationFlags.append(QString("-r=%1/%2").arg(simulationOptions.getWorkingDirectory(), simulationOptions.getFullResultFileName()));
   // jacobian
   if (!mpJacobianComboBox->currentText().isEmpty()) {
     simulationFlags.append(QString("-jacobian=").append(mpJacobianComboBox->currentText()));
@@ -1146,9 +1173,7 @@ SimulationOptions SimulationDialog::createSimulationOptions()
     simulationFlags.append("-embeddedServer=opc-ua");
     // embedded server port
     if (mpInteractiveSimulationPortNumberTextBox->text().isEmpty()) {
-      qint16 port = 4841;
-      simulationOptions.setInteractiveSimulationPortNumber(port);
-      simulationFlags.append(QString("-embeddedServerPort=").append(QString::number(port)));
+      simulationFlags.append(QString("-embeddedServerPort=").append(QString::number(simulationOptions.getInteractiveSimulationPortNumber())));
     } else {
       bool isInt;
       int portNumber = mpInteractiveSimulationPortNumberTextBox->text().toInt(&isInt);
@@ -1202,6 +1227,7 @@ void SimulationDialog::createAndShowSimulationOutputWidget(SimulationOptions sim
         }
       }
     }
+
     SimulationOutputWidget *pSimulationOutputWidget = new SimulationOutputWidget(simulationOptions);
     mSimulationOutputWidgetsList.append(pSimulationOutputWidget);
     int xPos = QApplication::desktop()->availableGeometry().width() - pSimulationOutputWidget->frameSize().width() - 20;
@@ -1291,6 +1317,7 @@ void SimulationDialog::saveSimulationFlagsAnnotation()
   if (!mpRootFindingCheckBox->isChecked()) {
     simulationFlags.insert("noRootFinding", "()");
   }
+  simulationFlags.insert("outputFormat", mpOutputFormatComboBox->currentText());
   if ((mpOutputFormatComboBox->currentText().compare("mat") == 0) && mpSinglePrecisionCheckBox->isChecked()) {
     simulationFlags.insert("single", "()");
   }
@@ -1427,6 +1454,10 @@ void SimulationDialog::performSimulation()
     simulationParameters.append(", cflags=").append("\"").append(mpCflagsTextBox->text()).append("\"");
   }
   simulationOptions = createSimulationOptions();
+  // If we are not doing a re-simulation then save the new SimulationOptions in the class.
+  if (!mIsReSimulate) {
+    mpLibraryTreeItem->mSimulationOptions = simulationOptions;
+  }
   // change the cursor to Qt::WaitCursor
   QApplication::setOverrideCursor(Qt::WaitCursor);
   // show the progress bar
@@ -1444,7 +1475,7 @@ void SimulationDialog::performSimulation()
   if (isTranslationSuccessful) {
     // check if we can compile using the target compiler
     SimulationPage *pSimulationPage = OptionsDialog::instance()->getSimulationPage();
-    QString targetCompiler = pSimulationPage->getTargetCompilerComboBox()->currentText();
+    QString targetCompiler = pSimulationPage->getTargetCompilerComboBox()->itemData(pSimulationPage->getTargetCompilerComboBox()->currentIndex()).toString();
     if ((targetCompiler.compare("vxworks69") == 0) || (targetCompiler.compare("debugrt") == 0)) {
       QString msg = tr("Generated code for the target compiler <b>%1</b> at %2.").arg(targetCompiler)
           .arg(simulationOptions.getWorkingDirectory());
@@ -1692,12 +1723,12 @@ void SimulationDialog::simulationProcessFinished(SimulationOptions simulationOpt
   }
   QString workingDirectory = simulationOptions.getWorkingDirectory();
   // read the result file
-  QFileInfo resultFileInfo(QString(workingDirectory).append("/").append(simulationOptions.getResultFileName()));
+  QFileInfo resultFileInfo(QString(workingDirectory).append("/").append(simulationOptions.getFullResultFileName()));
   QRegExp regExp("\\b(mat|plt|csv)\\b");
   /* ticket:4935 Check the simulation result size via readSimulationResultSize
    * If the result size is zero then don't switch to the plotting view.
    */
-  if (regExp.indexIn(simulationOptions.getResultFileName()) != -1 &&
+  if (regExp.indexIn(simulationOptions.getFullResultFileName()) != -1 &&
       resultFileInfo.exists() && resultFileLastModifiedDateTime <= resultFileInfo.lastModified() &&
       MainWindow::instance()->getOMCProxy()->readSimulationResultSize(resultFileInfo.absoluteFilePath()) > 0) {
     VariablesWidget *pVariablesWidget = MainWindow::instance()->getVariablesWidget();
@@ -1712,7 +1743,7 @@ void SimulationDialog::simulationProcessFinished(SimulationOptions simulationOpt
         // if simulated with animation then open the animation directly.
         if (mpLaunchAnimationCheckBox->isChecked()) {
           showPlotWindow = false;
-          if (simulationOptions.getResultFileName().endsWith(".mat")) {
+          if (simulationOptions.getFullResultFileName().endsWith(".mat")) {
             MainWindow::instance()->getPlotWindowContainer()->addAnimationWindow(MainWindow::instance()->getPlotWindowContainer()->subWindowList().isEmpty());
             AnimationWindow *pAnimationWindow = MainWindow::instance()->getPlotWindowContainer()->getCurrentAnimationWindow();
             if (pAnimationWindow) {
@@ -1729,18 +1760,19 @@ void SimulationDialog::simulationProcessFinished(SimulationOptions simulationOpt
 #endif
         MainWindow::instance()->getPerspectiveTabBar()->setCurrentIndex(2);
         if (showPlotWindow) {
-          OMPlot::PlotWindow *pPlotWindow = MainWindow::instance()->getPlotWindowContainer()->getTopPlotWindow();
-          if (pPlotWindow) {
-            MainWindow::instance()->getPlotWindowContainer()->setTopPlotWindowActive();
-          } else {
-            MainWindow::instance()->getPlotWindowContainer()->addPlotWindow(MainWindow::instance()->getPlotWindowContainer()->subWindowList().isEmpty());
+          QList<QMdiSubWindow*> subWindowsList = MainWindow::instance()->getPlotWindowContainer()->subWindowList(QMdiArea::ActivationHistoryOrder);
+          if (!subWindowsList.isEmpty() && subWindowsList.last()->widget()->objectName().compare("diagramWindow") != 0) {
+            OMPlot::PlotWindow *pPlotWindow = MainWindow::instance()->getPlotWindowContainer()->getTopPlotWindow();
+            if (pPlotWindow) {
+              MainWindow::instance()->getPlotWindowContainer()->setTopPlotWindowActive();
+            }
           }
         }
       } else {
         // stay in current perspective and show variables browser
         MainWindow::instance()->getVariablesDockWidget()->show();
       }
-      pVariablesWidget->insertVariablesItemsToTree(simulationOptions.getResultFileName(), workingDirectory, list, simulationOptions);
+      pVariablesWidget->insertVariablesItemsToTree(simulationOptions.getFullResultFileName(), workingDirectory, list, simulationOptions);
     }
   }
   if (OptionsDialog::instance()->getDebuggerPage()->getAlwaysShowTransformationsCheckBox()->isChecked() ||
@@ -1932,10 +1964,7 @@ void SimulationDialog::simulate()
 {
   if (validate()) {
     // interactive simulation
-    if (mpInteractiveSimulationGroupBox->isChecked()) {
-      performSimulation();
-    }
-    else if (mIsReSimulate) {
+    if (mpInteractiveSimulationGroupBox->isChecked() || mIsReSimulate) {
       performSimulation();
     } else {
       // if no option is selected then show error message to user
@@ -1971,25 +2000,15 @@ void SimulationDialog::simulate()
 
 /*!
  * \brief SimulationDialog::resultFileNameChanged
+ * Slot activated when mpOutputFormatComboBox currentIndexChanged signal is raised.
  * \param text
- * Slot activated when mpResultFileNameTextBox textEdited OR mpOutputFormatComboBox currentIndexChanged signal is raised.\n
- * Sets the result file name label.
  */
 void SimulationDialog::resultFileNameChanged(QString text)
 {
-  QLineEdit *pLineEditSender = qobject_cast<QLineEdit*>(sender());
+  Q_UNUSED(text);
   QComboBox *pComboBoxSender = qobject_cast<QComboBox*>(sender());
-
-  if (pLineEditSender) {
-    if (text.isEmpty()) {
-      mpResultFileName->clear();
-    } else {
-      mpResultFileName->setText(QString("%1_res.%2").arg(text).arg(mpOutputFormatComboBox->currentText()));
-    }
-  } else if (pComboBoxSender) {
+  if (pComboBoxSender) {
     mpSinglePrecisionCheckBox->setEnabled(mpOutputFormatComboBox->currentText().compare("mat") == 0);
-    if (!mpResultFileNameTextBox->text().isEmpty()) {
-      mpResultFileName->setText(QString("%1_res.%2").arg(mpResultFileNameTextBox->text()).arg(mpOutputFormatComboBox->currentText()));
-    }
+    mpResultFileNameTextBox->setPlaceholderText(QString("%1_res.%2").arg(mClassName).arg(mpOutputFormatComboBox->currentText()));
   }
 }

@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -45,7 +45,7 @@ QString Helper::OpenModelicaVersion = "";
 QString Helper::OpenModelicaHome = "";
 QString Helper::OpenModelicaLibrary = "";
 QString Helper::OMCServerName = "OMEdit";
-QString Helper::omFileTypes = "Modelica Files (*.mo)";
+QString Helper::omFileTypes = "All Modelica Files (*.mo *.mol);;Modelica Files (*.mo);;Encrypted Modelica Libraries (*.mol)";
 QString Helper::omEncryptedFileTypes = "Encrypted Modelica Libraries (*.mol)";
 QString Helper::omnotebookFileTypes = "OMNotebook Files (*.onb *.onbz *.nb)";
 QString Helper::ngspiceNetlistFileTypes = "ngspice Netlist Files (*.cir *.sp *.spice)";
@@ -64,11 +64,14 @@ QString Helper::exeFileTypes = "Executable files (*)";
 QString Helper::txtFileTypes = "TXT Files (*.txt)";
 QString Helper::figaroFileTypes = "Figaro Files (*.fi)";
 QString Helper::visualizationFileTypes = "Visualization Files (*.mat *.csv *.fmu);;Visualization MAT(*.mat);;Visualization CSV(*.csv);;Visualization FMU(*.fmu)";
+QString Helper::omsFileTypes = "Composite Model Files (*.ssp)";
+QString Helper::subModelFileTypes = "SubModel Files (*.fmu *.mat *.csv);;SubModel FMU (*.fmu);;SubModel MAT (*.mat);;SubModel CSV (*.csv)";
 int Helper::treeIndentation = 13;
 QSize Helper::iconSize = QSize(20, 20);
 int Helper::tabWidth = 20;
 QString Helper::modelicaComponentFormat = "image/modelica-component";
 QString Helper::modelicaFileFormat = "text/uri-list";
+QString Helper::busConnectorFormat = "bus/connector";
 qreal Helper::shapesStrokeWidth = 2.0;
 int Helper::headingFontSize = 18;
 QString Helper::ModelicaSimulationOutputFormats = "mat,plt,csv";
@@ -94,6 +97,7 @@ QString Helper::toolsOptionsPath = "OMEdit->Preferences";
 #else
 QString Helper::toolsOptionsPath = "Tools->Options";
 #endif
+QString Helper::speedOptions = "10,5,2,1,0.5,0.2,0.1";
 /* Meta Modelica Types */
 QString Helper::MODELICA_METATYPE = QString("modelica_metatype");
 QString Helper::MODELICA_STRING = QString("modelica_string");
@@ -112,6 +116,10 @@ QString Helper::STRING = QString("String");
 QString Helper::BOOLEAN = QString("Boolean");
 QString Helper::INTEGER = QString("Integer");
 QString Helper::REAL = QString("Real");
+/* OMSimulator system types */
+QString Helper::systemTLM = QString("TLM - Transmission Line Modeling System");
+QString Helper::systemWC = QString("Weakly Coupled - Connected Co-Simulation FMUs System");
+QString Helper::systemSC = QString("Strongly Coupled - Connected Model-Exchange FMUs System");
 /* Global translated variables */
 QString Helper::newModelicaClass;
 QString Helper::createNewModelicaClass;
@@ -146,6 +154,7 @@ QString Helper::chooseDirectory;
 QString Helper::general;
 QString Helper::output;
 QString Helper::parameters;
+QString Helper::inputs;
 QString Helper::name;
 QString Helper::comment;
 QString Helper::path;
@@ -153,6 +162,7 @@ QString Helper::type;
 QString Helper::information;
 QString Helper::rename;
 QString Helper::renameTip;
+QString Helper::OMSRenameTip;
 QString Helper::checkModel;
 QString Helper::checkModelTip;
 QString Helper::checkAllModels;
@@ -193,9 +203,12 @@ QString Helper::duplicate;
 QString Helper::duplicateTip;
 QString Helper::unloadClassTip;
 QString Helper::unloadCompositeModelOrTextTip;
+QString Helper::unloadOMSModelTip;
 QString Helper::refresh;
 QString Helper::simulate;
 QString Helper::simulateTip;
+QString Helper::callFunction;
+QString Helper::callFunctionTip;
 QString Helper::reSimulate;
 QString Helper::reSimulateTip;
 QString Helper::reSimulateSetup;
@@ -342,6 +355,23 @@ QString Helper::animationPause;
 QString Helper::animationPauseTip;
 QString Helper::simulationParams;
 QString Helper::simulationParamsTip;
+QString Helper::newModel;
+QString Helper::addSystem;
+QString Helper::addSystemTip;
+QString Helper::addSubModel;
+QString Helper::addSubModelTip;
+QString Helper::addBus;
+QString Helper::addBusTip;
+QString Helper::editBus;
+QString Helper::addTLMBus;
+QString Helper::addTLMBusTip;
+QString Helper::editTLMBus;
+QString Helper::addConnector;
+QString Helper::addConnectorTip;
+QString Helper::addBusConnection;
+QString Helper::editBusConnection;
+QString Helper::addTLMConnection;
+QString Helper::editTLMConnection;
 QString Helper::running;
 QString Helper::finished;
 QString Helper::newVariable;
@@ -350,8 +380,8 @@ QString Helper::moveUp;
 QString Helper::moveDown;
 QString Helper::fixErrorsManually;
 QString Helper::revertToLastCorrectVersion;
-QString Helper::OMCFlags;
-QString Helper::OMCFlagsTip;
+QString Helper::OMCCommandLineOptions;
+QString Helper::OMCCommandLineOptionsTip;
 QString Helper::saveExperimentAnnotation;
 QString Helper::saveOpenModelicaSimulationFlagsAnnotation;
 QString Helper::item;
@@ -364,6 +394,17 @@ QString Helper::synchronize;
 QString Helper::priority;
 QString Helper::secs;
 QString Helper::saveContentsInOneFile;
+QString Helper::OMSSimulateTip;
+QString Helper::dateTime;
+QString Helper::startTime;
+QString Helper::stopTime;
+QString Helper::status;
+QString Helper::speed;
+QString Helper::instantiateOMSModelTip;
+QString Helper::terminateInstantiation;
+QString Helper::terminateInstantiationTip;
+QString Helper::archivedSimulations;
+QString Helper::systemSimulationInformation;
 
 void Helper::initHelperVariables()
 {
@@ -402,6 +443,7 @@ void Helper::initHelperVariables()
   Helper::general = tr("General");
   Helper::output = tr("Output");
   Helper::parameters = tr("Parameters");
+  Helper::inputs = tr("Inputs");
   Helper::name = tr("Name:");
   Helper::comment = tr("Comment:");
   Helper::path = tr("Path:");
@@ -409,6 +451,7 @@ void Helper::initHelperVariables()
   Helper::information = tr("Information");
   Helper::rename = tr("Rename");
   Helper::renameTip = tr("Renames an item");
+  Helper::OMSRenameTip = tr("OMSimulator rename");
   Helper::checkModel = tr("Check Model");
   Helper::checkModelTip = tr("Check the Modelica class");
   Helper::checkAllModels = tr("Check All Models");
@@ -449,9 +492,12 @@ void Helper::initHelperVariables()
   Helper::unloadClass = tr("Unload");
   Helper::unloadClassTip = tr("Unload the Modelica class");
   Helper::unloadCompositeModelOrTextTip = tr("Unloads the CompositeModel/Text file");
+  Helper::unloadOMSModelTip = tr("Unloads the model");
   Helper::refresh = tr("Refresh");
   Helper::simulate = tr("Simulate");
   Helper::simulateTip = tr("Simulates the Modelica class");
+  Helper::callFunction = tr("Call function");
+  Helper::callFunctionTip = tr("Calls the Modelica function");
   Helper::reSimulate = tr("Re-simulate");
   Helper::reSimulateTip = tr("Re-simulates the Modelica class");
   Helper::reSimulateSetup = tr("Re-simulate Setup");
@@ -598,6 +644,23 @@ void Helper::initHelperVariables()
   Helper::animationPauseTip = tr("Pause the animation");
   Helper::simulationParams = tr("Simulation Parameters");
   Helper::simulationParamsTip = tr("Shows the Simulation Parameters dialog");
+  Helper::newModel = tr("New OMSimulator Model");
+  Helper::addSystem = tr("Add System");
+  Helper::addSystemTip = tr("Adds the System i.e., FMI or TLM");
+  Helper::addSubModel = tr("Add SubModel");
+  Helper::addSubModelTip = tr("Adds the SubModel i.e., FMU or Table");
+  Helper::addBus = tr("Add Bus");
+  Helper::addBusTip = tr("Adds the bus");
+  Helper::editBus = tr("Edit Bus");
+  Helper::addTLMBus = tr("Add TLM Bus");
+  Helper::addTLMBusTip = tr("Adds the TLM bus");
+  Helper::editTLMBus = tr("Edit TLM Bus");
+  Helper::addConnector = tr("Add Connector");
+  Helper::addConnectorTip = tr("Adds the connector");
+  Helper::addBusConnection = tr("Add Bus Connection");
+  Helper::editBusConnection = tr("Edit Bus Connection");
+  Helper::addTLMConnection = tr("Add TLM Connection");
+  Helper::editTLMConnection = tr("Edit TLM Connection");
   Helper::running = tr("Running");
   Helper::finished = tr("Finished");
   Helper::newVariable = tr("<New Variable>");
@@ -606,8 +669,8 @@ void Helper::initHelperVariables()
   Helper::moveDown = tr("Move Down");
   Helper::fixErrorsManually = tr("Fix error(s) manually");
   Helper::revertToLastCorrectVersion = tr("Revert to last correct version");
-  Helper::OMCFlags = tr("OMC Flags");
-  Helper::OMCFlagsTip = tr("Space separated list of flags e.g., -d=initialization --cheapmatchingAlgorithm=3");
+  Helper::OMCCommandLineOptions = tr("OMC Command Line Options");
+  Helper::OMCCommandLineOptionsTip = tr("Space separated list of OMC command line options e.g., -d=initialization --cheapmatchingAlgorithm=3");
   Helper::saveExperimentAnnotation = tr("Save experiment annotation inside model");
   Helper::saveOpenModelicaSimulationFlagsAnnotation = tr("Save __OpenModelica_simulationFlags annotation inside model");
   Helper::item = tr("item");
@@ -620,6 +683,17 @@ void Helper::initHelperVariables()
   Helper::priority = tr("Priority:");
   Helper::secs = tr("secs");
   Helper::saveContentsInOneFile = tr("Save contents in one file");
+  Helper::OMSSimulateTip = tr("Simulates the OMSimulator model");
+  Helper::dateTime = tr("DateTime");
+  Helper::startTime = tr("Start Time");
+  Helper::stopTime = tr("Stop Time");
+  Helper::status = tr("Status");
+  Helper::speed = tr("Speed:");
+  Helper::instantiateOMSModelTip = tr("Instantiates the OMSimulator model");
+  Helper::terminateInstantiation = tr("Terminate Instantiation");
+  Helper::terminateInstantiationTip = tr("Terminates the model instantiation");
+  Helper::archivedSimulations = tr("Archived Simulations");
+  Helper::systemSimulationInformation = tr("System Simulation Information");
 }
 
 QString GUIMessages::getMessage(int type)
@@ -696,6 +770,8 @@ QString GUIMessages::getMessage(int type)
       return tr("A component with the name <b>%1</b> already exists. The name is changed from <b>%1</b> to <b>%2</b>.<br /><br />This is probably wrong because the component is declared as <b>inner</b>.");
     case FMU_GENERATED:
       return tr("The FMU is generated at <b>%1</b>.");
+    case FMU_EMPTY_PLATFORMS:
+      return tr("A source-only FMU will be generated because an empty list of platforms is selected. If this is not intended, check settings in <b>%1->FMI->Platforms</b>.");
     case XML_GENERATED:
       return tr("The XML is generated at <b>%1</b>.");
     case FIGARO_GENERATED:
@@ -713,7 +789,7 @@ QString GUIMessages::getMessage(int type)
     case WRONG_MODIFIER:
       return tr("The Modifier <b>%1</b> format is invalid. The correct format is <b>phi(start=1)</b>");
     case SET_INFO_XML_FLAG:
-      return tr("The operations were not generated. Check Generate Operations in <b>%1->Debugger->Transformational Debugger</b> OR you must set the -d=infoXmlOperations flag via <b>%2->Simulation->OMC Flags</b> and simulate again.");
+      return tr("The operations were not generated. Check Generate Operations in <b>%1->Debugger->Transformational Debugger</b> OR you must set the -d=infoXmlOperations flag via <b>%2->Simulation->OMC Command Line Options</b> and simulate again.");
     case DEBUG_CONFIGURATION_EXISTS_MSG:
       return tr("A debug configuration with name <b>%1</b> already exists. Error occurred while saving the debug configuration <b>%2<b>.");
     case DEBUG_CONFIGURATION_SIZE_EXCEED:

@@ -13,7 +13,7 @@
    height="32px"
    id="svg2985"
    version="1.1"
-   inkscape:version="0.48.4 r9939"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"
    sodipodi:docname="model-icon.svg">
   <defs
      id="defs2987" />
@@ -25,14 +25,14 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="11.197802"
-     inkscape:cx="-15.915893"
-     inkscape:cy="6.506247"
+     inkscape:cx="-10.612857"
+     inkscape:cy="9.7448474"
      inkscape:current-layer="layer1"
      showgrid="true"
      inkscape:grid-bbox="true"
      inkscape:document-units="px"
      inkscape:window-width="1600"
-     inkscape:window-height="838"
+     inkscape:window-height="837"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
@@ -66,15 +66,14 @@
        y="0.92247248" />
     <text
        xml:space="preserve"
-       style="font-size:40px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Courier New;-inkscape-font-specification:Courier New Bold"
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;line-height:0%;font-family:'Courier New';-inkscape-font-specification:'Courier New Bold';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
        x="5.4474978"
        y="26.641806"
-       id="text3782"
-       sodipodi:linespacing="125%"><tspan
+       id="text3782"><tspan
          sodipodi:role="line"
          id="tspan3784"
          x="5.4474978"
          y="26.641806"
-         style="font-size:36px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#1439f2;fill-opacity:1;font-family:Courier New;-inkscape-font-specification:Courier New Bold">M</tspan></text>
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:36px;line-height:1.25;font-family:'Courier New';-inkscape-font-specification:'Courier New Bold';fill:#1439f2;fill-opacity:1">M</tspan></text>
   </g>
 </svg>

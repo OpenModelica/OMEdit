@@ -184,5 +184,28 @@
         <file>Resources/icons/completerCodeSnippets.svg</file>
         <file>Resources/icons/array-parametric-plot-window.svg</file>
         <file>Resources/icons/update.svg</file>
+        <file>Resources/icons/tlm-system-icon.svg</file>
+        <file>Resources/icons/wc-system-icon.svg</file>
+        <file>Resources/icons/sc-system-icon.svg</file>
+        <file>Resources/icons/fmu-icon.svg</file>
+        <file>Resources/icons/add-system.svg</file>
+        <file>Resources/icons/bitmap-delete.svg</file>
+        <file>Resources/icons/add-connector.svg</file>
+        <file>Resources/icons/bus.svg</file>
+        <file>Resources/icons/tlm-bus.svg</file>
+        <file>Resources/icons/real-input-connector.svg</file>
+        <file>Resources/icons/real-output-connector.svg</file>
+        <file>Resources/icons/integer-input-connector.svg</file>
+        <file>Resources/icons/integer-output-connector.svg</file>
+        <file>Resources/icons/boolean-input-connector.svg</file>
+        <file>Resources/icons/boolean-output-connector.svg</file>
+        <file>Resources/icons/bus-connector.svg</file>
+        <file>Resources/icons/tlm-input-bus-connector.svg</file>
+        <file>Resources/icons/tlm-output-bus-connector.svg</file>
+        <file>Resources/icons/tlm-rotational-bus-connector.svg</file>
+        <file>Resources/icons/tlm-hydraulic-bus-connector.svg</file>
+        <file>Resources/icons/tlm-electric-bus-connector.svg</file>
+        <file>Resources/icons/tlm-mechanical-bus-connector.svg</file>
+        <file>Resources/icons/instantiate.svg</file>
     </qresource>
 </RCC>

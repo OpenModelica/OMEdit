@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -71,6 +71,17 @@ PolygonAnnotation::PolygonAnnotation(ShapeAnnotation *pShapeAnnotation, Graphics
   connect(pShapeAnnotation, SIGNAL(added()), this, SLOT(referenceShapeAdded()));
   connect(pShapeAnnotation, SIGNAL(changed()), this, SLOT(referenceShapeChanged()));
   connect(pShapeAnnotation, SIGNAL(deleted()), this, SLOT(referenceShapeDeleted()));
+}
+
+PolygonAnnotation::PolygonAnnotation(Component *pParent)
+  : ShapeAnnotation(pParent)
+{
+  // set the default values
+  GraphicItem::setDefaults();
+  FilledShape::setDefaults();
+  ShapeAnnotation::setDefaults();
+  setPos(mOrigin);
+  setRotation(mRotation);
 }
 
 void PolygonAnnotation::parseShapeAnnotation(QString annotation)

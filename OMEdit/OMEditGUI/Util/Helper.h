@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -70,11 +70,14 @@ public:
   static QString txtFileTypes;
   static QString figaroFileTypes;
   static QString visualizationFileTypes;
+  static QString omsFileTypes;
+  static QString subModelFileTypes;
   static int treeIndentation;
   static QSize iconSize;
   static int tabWidth;
   static QString modelicaComponentFormat;
   static QString modelicaFileFormat;
+  static QString busConnectorFormat;
   static qreal shapesStrokeWidth;
   static int headingFontSize;
   static QString ModelicaSimulationOutputFormats;
@@ -96,6 +99,7 @@ public:
   static QFontInfo systemFontInfo;
   static QFontInfo monospacedFontInfo;
   static QString toolsOptionsPath;
+  static QString speedOptions;
   /* Meta Modelica Types */
   static QString MODELICA_METATYPE;
   static QString MODELICA_STRING;
@@ -114,6 +118,10 @@ public:
   static QString BOOLEAN;
   static QString INTEGER;
   static QString REAL;
+  /* OMSimulator system types */
+  static QString systemTLM;
+  static QString systemWC;
+  static QString systemSC;
   /* Global translated variables */
   static QString newModelicaClass;
   static QString createNewModelicaClass;
@@ -148,6 +156,7 @@ public:
   static QString general;
   static QString output;
   static QString parameters;
+  static QString inputs;
   static QString name;
   static QString comment;
   static QString path;
@@ -155,6 +164,7 @@ public:
   static QString information;
   static QString rename;
   static QString renameTip;
+  static QString OMSRenameTip;
   static QString checkModel;
   static QString checkModelTip;
   static QString checkAllModels;
@@ -195,9 +205,12 @@ public:
   static QString unloadClass;
   static QString unloadClassTip;
   static QString unloadCompositeModelOrTextTip;
+  static QString unloadOMSModelTip;
   static QString refresh;
   static QString simulate;
   static QString simulateTip;
+  static QString callFunction;
+  static QString callFunctionTip;
   static QString reSimulate;
   static QString reSimulateTip;
   static QString reSimulateSetup;
@@ -344,6 +357,23 @@ public:
   static QString animationPauseTip;
   static QString simulationParams;
   static QString simulationParamsTip;
+  static QString newModel;
+  static QString addSystem;
+  static QString addSystemTip;
+  static QString addSubModel;
+  static QString addSubModelTip;
+  static QString addBus;
+  static QString addBusTip;
+  static QString editBus;
+  static QString addTLMBus;
+  static QString addTLMBusTip;
+  static QString editTLMBus;
+  static QString addConnector;
+  static QString addConnectorTip;
+  static QString addBusConnection;
+  static QString editBusConnection;
+  static QString addTLMConnection;
+  static QString editTLMConnection;
   static QString running;
   static QString finished;
   static QString newVariable;
@@ -352,8 +382,8 @@ public:
   static QString moveDown;
   static QString fixErrorsManually;
   static QString revertToLastCorrectVersion;
-  static QString OMCFlags;
-  static QString OMCFlagsTip;
+  static QString OMCCommandLineOptions;
+  static QString OMCCommandLineOptionsTip;
   static QString saveExperimentAnnotation;
   static QString saveOpenModelicaSimulationFlagsAnnotation;
   static QString item;
@@ -366,6 +396,17 @@ public:
   static QString priority;
   static QString secs;
   static QString saveContentsInOneFile;
+  static QString OMSSimulateTip;
+  static QString dateTime;
+  static QString startTime;
+  static QString stopTime;
+  static QString status;
+  static QString speed;
+  static QString instantiateOMSModelTip;
+  static QString terminateInstantiation;
+  static QString terminateInstantiationTip;
+  static QString archivedSimulations;
+  static QString systemSimulationInformation;
 };
 
 class GUIMessages : public QObject
@@ -408,6 +449,7 @@ public:
     MAKE_REPLACEABLE_IF_PARTIAL,
     INNER_MODEL_NAME_CHANGED,
     FMU_GENERATED,
+    FMU_EMPTY_PLATFORMS,
     XML_GENERATED,
     FIGARO_GENERATED,
     ENCRYPTED_PACKAGE_GENERATED,

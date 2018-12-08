@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -776,7 +776,7 @@ void ComponentParameters::setUpDialog()
   mpOkButton = new QPushButton(Helper::ok);
   mpOkButton->setAutoDefault(true);
   connect(mpOkButton, SIGNAL(clicked()), this, SLOT(updateComponentParameters()));
-  if (mpComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->isSystemLibrary()) {
+  if (mpComponent->getGraphicsView()->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() || mpComponent->getGraphicsView()->isVisualizationView()) {
     mpOkButton->setDisabled(true);
   }
   mpCancelButton = new QPushButton(Helper::cancel);

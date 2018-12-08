@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -39,6 +39,7 @@
 
 #include "Simulation/SimulationOptions.h"
 #include "PlotWindow.h"
+#include "Animation/TimeManager.h"
 
 class OMCProxy;
 class TreeSearchFilters;
@@ -64,11 +65,13 @@ public:
   void setChecked(bool set) {mChecked = set;}
   bool isEditable() const {return mEditable;}
   void setEditable(bool set) {mEditable = set;}
+  void setVariability(QString variability) {mVariability = variability;}
+  bool isParameter() const {return mVariability.compare("parameter") == 0;}
   bool isMainArray() const {return mIsMainArray;}
-  bool isEnabled() const {return mEnabled;}
-  void setEnabled(bool set) {mEnabled = set;}
   SimulationOptions getSimulationOptions() {return mSimulationOptions;}
   void setSimulationOptions(SimulationOptions simulationOptions) {mSimulationOptions = simulationOptions;}
+  bool isActive() const {return mActive;}
+  void setActive();
   QIcon getVariableTreeItemIcon(QString name) const;
   void insertChild(int position, VariablesTreeItem *pVariablesTreeItem);
   VariablesTreeItem* child(int row);
@@ -100,9 +103,11 @@ private:
   QString mToolTip;
   bool mChecked;
   bool mEditable;
+  QString mVariability;
   bool mIsMainArray;
-  bool mEnabled;
   SimulationOptions mSimulationOptions;
+protected:
+  bool mActive;
 };
 
 class VariablesTreeView;
@@ -112,6 +117,7 @@ class VariablesTreeModel : public QAbstractItemModel
 public:
   VariablesTreeModel(VariablesTreeView *pVariablesTreeView = 0);
   VariablesTreeItem* getRootVariablesTreeItem() {return mpRootVariablesTreeItem;}
+  VariablesTreeItem* getActiveVariablesTreeItem() {return mpActiveVariablesTreeItem;}
   int columnCount(const QModelIndex &parent = QModelIndex()) const;
   int rowCount(const QModelIndex &parent = QModelIndex()) const;
   QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
@@ -133,9 +139,10 @@ public:
 private:
   VariablesTreeView *mpVariablesTreeView;
   VariablesTreeItem *mpRootVariablesTreeItem;
+  VariablesTreeItem *mpActiveVariablesTreeItem;
   QHash<QString, QHash<QString,QString> > mScalarVariablesList;
-  void getVariableInformation(ModelicaMatReader *pMatReader, QString variableToFind, QString *value, bool *changeAble, QString *unit,
-                              QString *displayUnit, QString *description);
+  void getVariableInformation(ModelicaMatReader *pMatReader, QString variableToFind, QString *value, bool *changeAble, QString *variability,
+                              QString *unit, QString *displayUnit, QString *description);
 signals:
   void itemChecked(const QModelIndex &index, qreal curveThickness, int curveStyle);
   void unitChanged(const QModelIndex &index);
@@ -143,6 +150,7 @@ signals:
   void variableTreeItemRemoved(QString variable);
 public slots:
   void removeVariableTreeItem();
+  void setVariableTreeItemActive();
 };
 
 class VariableTreeProxyModel : public QSortFilterProxyModel
@@ -188,11 +196,22 @@ public:
   void reSimulate(bool showSetup);
   void interactiveReSimulation(QString modelName);
   void updateInitXmlFile(SimulationOptions simulationOptions);
+  void initializeVisualization(SimulationOptions simulationOptions);
+  double readVariableValue(QString variable, double time);
 private:
   TreeSearchFilters *mpTreeSearchFilters;
   Label *mpSimulationTimeLabel;
   QComboBox *mpSimulationTimeComboBox;
   QSlider *mpSimulationTimeSlider;
+  QToolBar *mpToolBar;
+  QAction *mpRewindAction;
+  QAction *mpPlayAction;
+  QAction *mpPauseAction;
+  Label *mpTimeLabel;
+  QLineEdit *mpTimeTextBox;
+  Label *mpSpeedLabel;
+  QComboBox *mpSpeedComboBox;
+  TimeManager *mpTimeManager;
   VariableTreeProxyModel *mpVariableTreeProxyModel;
   VariablesTreeModel *mpVariablesTreeModel;
   VariablesTreeView *mpVariablesTreeView;
@@ -200,7 +219,13 @@ private:
   QHash<QString, QList<QString>> mSelectedInteractiveVariables;
   QString mFileName;
   QMdiSubWindow *mpLastActiveSubWindow;
+  ModelicaMatReader mModelicaMatReader;
+  csv_data *mpCSVData;
+  QFile mPlotFileReader;
   void selectInteractivePlotWindow(VariablesTreeItem *pVariablesTreeItem);
+  void closeResultFile();
+  void openResultFile();
+  void updateVisualization();
 public slots:
   void plotVariables(const QModelIndex &index, qreal curveThickness, int curveStyle,
                      OMPlot::PlotCurve *pPlotCurve = 0, OMPlot::PlotWindow *pPlotWindow = 0);
@@ -213,6 +238,15 @@ public slots:
   void findVariables();
   void directReSimulate();
   void showReSimulateSetup();
+  void rewindVisualization();
+private slots:
+  void playVisualization();
+  void pauseVisualization();
+  void visulizationTimeChanged();
+  void visualizationSpeedChanged();
+  void incrementVisualization();
+signals:
+  void updateDynamicSelect(double time);
 };
 
 #endif // VARIABLESWIDGET_H

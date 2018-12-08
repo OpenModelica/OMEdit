@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -36,12 +36,14 @@
 #include "MainWindow.h"
 #include "OMC/OMCProxy.h"
 #include "Modeling/LibraryTreeWidget.h"
+#include "Modeling/ModelWidgetContainer.h"
 #include "Options/OptionsDialog.h"
 #include "Git/CommitChangesDialog.h"
 #include "Util/Helper.h"
 #include "Util/StringHandler.h"
 
 #include <QMessageBox>
+#include <QGridLayout>
 
 /*!
  * \class ImportFMUModelDescriptionDialog

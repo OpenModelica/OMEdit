@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -36,6 +36,7 @@
 #define BITMAPANNOTATION_H
 
 #include "ShapeAnnotation.h"
+#include "Util/Utilities.h"
 
 class Component;
 class BitmapAnnotation : public ShapeAnnotation
@@ -48,6 +49,8 @@ public:
   BitmapAnnotation(ShapeAnnotation *pShapeAnnotation, Component *pParent);
   // Used for icon/diagram inherited shape
   BitmapAnnotation(ShapeAnnotation *pShapeAnnotation, GraphicsView *pGraphicsView);
+  // Used for OMSimulator FMU
+  BitmapAnnotation(QString classFileName, GraphicsView *pGraphicsView);
   void parseShapeAnnotation(QString annotation);
   QRectF boundingRect() const;
   QPainterPath shape() const;

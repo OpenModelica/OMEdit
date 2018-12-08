@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -76,6 +76,7 @@ class ThreeDViewer;
 class BreakpointsWidget;
 class SimulationDialog;
 class TLMCoSimulationDialog;
+class OMSSimulationDialog;
 class ModelWidgetContainer;
 class WelcomePageWidget;
 class InfoBar;
@@ -104,6 +105,7 @@ public:
   OMCProxy* getOMCProxy() {return mpOMCProxy;}
   void setExitApplicationStatus(bool status) {mExitApplicationStatus = status;}
   bool getExitApplicationStatus() {return mExitApplicationStatus;}
+  int getNumberOfProcessors() {return mNumberOfProcessors;}
   LibraryWidget* getLibraryWidget() {return mpLibraryWidget;}
   StackFramesWidget* getStackFramesWidget() {return mpStackFramesWidget;}
   BreakpointsWidget* getBreakpointsWidget() {return mpBreakpointsWidget;}
@@ -125,6 +127,7 @@ public:
 #endif
   SimulationDialog* getSimulationDialog() {return mpSimulationDialog;}
   TLMCoSimulationDialog* getTLMCoSimulationDialog() {return mpTLMCoSimulationDialog;}
+  OMSSimulationDialog* getOMSSimulationDialog() {return mpOMSSimulationDialog;}
   ModelWidgetContainer* getModelWidgetContainer() {return mpModelWidgetContainer;}
   WelcomePageWidget* getWelcomePageWidget() {return mpWelcomePageWidget;}
   GitCommands* getGitCommands() {return mpGitCommands;}
@@ -183,6 +186,15 @@ public:
   QAction* getFetchInterfaceDataAction() {return mpFetchInterfaceDataAction;}
   QAction* getAlignInterfacesAction() {return mpAlignInterfacesAction;}
   QAction* getTLMSimulationAction() {return mpTLMCoSimulationAction;}
+  QAction* getAddSystemAction() {return mpAddSystemAction;}
+  QAction* getAddOrEditIconAction() {return mpAddOrEditIconAction;}
+  QAction* getDeleteIconAction() {return mpDeleteIconAction;}
+  QAction* getAddConnectorAction() {return mpAddConnectorAction;}
+  QAction* getAddBusAction() {return mpAddBusAction;}
+  QAction* getAddTLMBusAction() {return mpAddTLMBusAction;}
+  QAction* getAddSubModelAction() {return mpAddSubModelAction;}
+  QAction* getOMSInstantiateModelAction() {return mpOMSInstantiateModelAction;}
+  QAction* getOMSSimulationSetupAction() {return mpOMSSimulateAction;}
   QAction* getLogCurrentFileAction() {return mpLogCurrentFileAction;}
   QAction* getStageCurrentFileForCommitAction() {return mpStageCurrentFileForCommitAction;}
   QAction* getUnstageCurrentFileFromCommitAction() {return mpUnstageCurrentFileFromCommitAction;}
@@ -203,6 +215,8 @@ public:
   void simulateWithAnimation(LibraryTreeItem *pLibraryTreeItem);
 #endif
   void simulationSetup(LibraryTreeItem *pLibraryTreeItem);
+  void instantiateOMSModel(LibraryTreeItem *pLibraryTreeItem, bool checked);
+  void simulateOMSModel(LibraryTreeItem *pLibraryTreeItem);
   void instantiateModel(LibraryTreeItem *pLibraryTreeItem);
   void checkModel(LibraryTreeItem *pLibraryTreeItem);
   void checkAllModels(LibraryTreeItem *pLibraryTreeItem);
@@ -229,6 +243,7 @@ private:
   bool mDebug;
   OMCProxy *mpOMCProxy;
   bool mExitApplicationStatus;
+  int mNumberOfProcessors;
   SearchWidget *mpSearchWidget;
   QDockWidget *mpSearchDockWidget;
   QDockWidget *mpMessagesDockWidget;
@@ -257,6 +272,7 @@ private:
 #endif
   SimulationDialog *mpSimulationDialog;
   TLMCoSimulationDialog *mpTLMCoSimulationDialog;
+  OMSSimulationDialog *mpOMSSimulationDialog;
   ModelWidgetContainer *mpModelWidgetContainer;
   WelcomePageWidget *mpWelcomePageWidget;
   GitCommands *mpGitCommands;
@@ -282,6 +298,9 @@ private:
   QAction *mpNewCompositeModelFileAction;
   QAction *mpOpenCompositeModelFileAction;
   QAction *mpLoadExternModelAction;
+  // OMSimulator File Actions
+  QAction *mpNewOMSimulatorModelAction;
+  QAction *mpOpenOMSModelFileAction;
   QAction *mpOpenDirectoryAction;
   QAction *mpSaveAction;
   QAction *mpSaveAsAction;
@@ -358,6 +377,7 @@ private:
   QAction *mpModelicaDocumentationAction;
   QAction *mpModelicaByExampleAction;
   QAction *mpModelicaWebReferenceAction;
+  QAction *mpOMSimulatorUsersGuideAction;
   QAction *mpOpenModelicaTLMSimulatorDocumentationAction;
   QAction *mpAboutOMEditAction;
   // Toolbar Actions
@@ -383,6 +403,7 @@ private:
 #if !defined(WITHOUT_OSG)
   QAction *mpNewAnimationWindowAction;
 #endif
+  QAction *mpDiagramWindowAction;
   QAction *mpClearPlotWindowAction;
   QAction *mpExportVariablesAction;
   // Other Actions
@@ -393,6 +414,17 @@ private:
   QAction *mpFetchInterfaceDataAction;
   QAction *mpAlignInterfacesAction;
   QAction *mpTLMCoSimulationAction;
+  // OMSimulator Actions
+  QAction *mpAddSystemAction;
+  QAction *mpAddOrEditIconAction;
+  QAction *mpDeleteIconAction;
+  QAction *mpAddConnectorAction;
+  QAction *mpAddBusAction;
+  QAction *mpAddTLMBusAction;
+  QAction *mpAddSubModelAction;
+  QAction *mpOMSInstantiateModelAction;
+  QAction *mpOMSSimulateAction;
+  QAction *mpOMSArchivedSimulationsAction;
   // Toolbars
   QMenu *mpRecentFilesMenu;
   QMenu *mpLibrariesMenu;
@@ -411,6 +443,7 @@ private:
   QMenu *mpDebugConfigurationMenu;
   QToolButton *mpDebugConfigurationToolButton;
   QToolBar *mpTLMSimulationToolbar;
+  QToolBar *mpOMSimulatorToobar;
   QHash<QString, TransformationsWidget*> mTransformationsWidgetHash;
 public slots:
   void showMessagesBrowser();
@@ -425,6 +458,8 @@ public slots:
   void createNewCompositeModelFile();
   void openCompositeModelFile();
   void loadExternalModels();
+  void createNewOMSModel();
+  void openOMSModelFile();
   void openDirectory();
   void loadSystemLibrary();
   void writeOutputFileData(QString data);
@@ -467,6 +502,9 @@ public slots:
   void exportToClipboard();
   void fetchInterfaceData();
   void TLMSimulate();
+  void instantiateOMSModel(bool checked);
+  void simulateOMSModel();
+  void showOMSArchivedSimulations();
   void openWorkingDirectory();
   void openTerminal();
   void openConfigurationOptions();
@@ -478,7 +516,8 @@ public slots:
   void openModelicaDocumentation();
   void openModelicaByExample();
   void openModelicaWebReference();
-  void openOpenModelicaTLMSimulatorDocumentationAction();
+  void openOMSimulatorUsersGuide();
+  void openOpenModelicaTLMSimulatorDocumentation();
   void openAboutOMEdit();
   void toggleShapesButton();
   void openRecentModelWidget();

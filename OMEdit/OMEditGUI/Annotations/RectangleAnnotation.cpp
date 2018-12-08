@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -91,6 +91,31 @@ RectangleAnnotation::RectangleAnnotation(Component *pParent)
   setRotation(mRotation);
 }
 
+/*!
+ * \brief RectangleAnnotation::RectangleAnnotation
+ * Used by OMSimulator FMU ModelWidget\n
+ * We always make this shape as inherited shape since its not allowed to be modified.
+ * \param pGraphicsView
+ */
+RectangleAnnotation::RectangleAnnotation(GraphicsView *pGraphicsView)
+  : ShapeAnnotation(true, pGraphicsView, 0)
+{
+  // set the default values
+  GraphicItem::setDefaults();
+  FilledShape::setDefaults();
+  ShapeAnnotation::setDefaults();
+  // create a grey rectangle
+  setLineColor(QColor(0, 0, 0));
+  setFillColor(QColor(240, 240, 240));
+  setFillPattern(StringHandler::FillSolid);
+  QList<QPointF> extents;
+  extents << QPointF(-100, -100) << QPointF(100, 100);
+  setExtents(extents);
+  setPos(mOrigin);
+  setRotation(mRotation);
+  setShapeFlags(true);
+}
+
 void RectangleAnnotation::parseShapeAnnotation(QString annotation)
 {
   GraphicItem::parseShapeAnnotation(annotation);
@@ -134,6 +159,15 @@ void RectangleAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsIte
   Q_UNUSED(option);
   Q_UNUSED(widget);
   if (mVisible || !mDynamicVisible.isEmpty()) {
+    // state machine visualization
+    if (mpParentComponent && mpParentComponent->getLibraryTreeItem() && mpParentComponent->getLibraryTreeItem()->isState()
+        && mpParentComponent->getGraphicsView()->isVisualizationView()) {
+      if (mpParentComponent->isActiveState()) {
+        painter->setOpacity(1.0);
+      } else {
+        painter->setOpacity(0.2);
+      }
+    }
     drawRectangleAnnotaion(painter);
   }
 }

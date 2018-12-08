@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -34,7 +34,9 @@
 
 #include "MainWindow.h"
 #include "LineAnnotation.h"
+#include "Modeling/ItemDelegate.h"
 #include "Modeling/Commands.h"
+#include "OMS/BusDialog.h"
 
 #include <QMessageBox>
 
@@ -55,6 +57,8 @@ LineAnnotation::LineAnnotation(QString annotation, GraphicsView *pGraphicsView)
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   // set the default values
   GraphicItem::setDefaults();
   ShapeAnnotation::setDefaults();
@@ -83,6 +87,8 @@ LineAnnotation::LineAnnotation(ShapeAnnotation *pShapeAnnotation, Component *pPa
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   setPos(mOrigin);
   setRotation(mRotation);
   connect(pShapeAnnotation, SIGNAL(updateReferenceShapes()), pShapeAnnotation, SIGNAL(changed()));
@@ -120,11 +126,31 @@ LineAnnotation::LineAnnotation(LineAnnotation::LineType lineType, Component *pSt
   setReset(true);
   setSynchronize(false);
   setPriority(1);
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   if (mLineType == LineAnnotation::ConnectionType) {
-    // use the linecolor of start component for the connection line.
-    if (pStartComponent->getShapesList().size() > 0) {
-      ShapeAnnotation *pShapeAnnotation = pStartComponent->getShapesList().at(0);
-      mLineColor = pShapeAnnotation->getLineColor();
+    /* Use the linecolor of the first shape from icon layer of start component for the connection line.
+     * Or use black color if there is no shape in the icon layer
+     * Dymola is doing it the way explained above. The Modelica specification doesn't say anything about it.
+     * We are also doing it the same way except that we will use the diagram layer shape if there is no shape in the icon layer.
+     * If there is no shape even in diagram layer then use the default black color.
+     */
+    if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::Modelica) {
+      if (pStartComponent->getShapesList().size() > 0) {
+        ShapeAnnotation *pShapeAnnotation = pStartComponent->getShapesList().at(0);
+        mLineColor = pShapeAnnotation->getLineColor();
+      }
+      if (pStartComponent->getLibraryTreeItem() && pStartComponent->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::Modelica) {
+        if (!pStartComponent->getLibraryTreeItem()->getModelWidget()) {
+          MainWindow::instance()->getLibraryWidget()->getLibraryTreeModel()->showModelWidget(pStartComponent->getLibraryTreeItem(), false);
+        }
+        ShapeAnnotation *pShapeAnnotation;
+        if (pStartComponent->getLibraryTreeItem()->getModelWidget()->getIconGraphicsView()
+            && pStartComponent->getLibraryTreeItem()->getModelWidget()->getIconGraphicsView()->getShapesList().size() > 0) {
+          pShapeAnnotation = pStartComponent->getLibraryTreeItem()->getModelWidget()->getIconGraphicsView()->getShapesList().at(0);
+          mLineColor = pShapeAnnotation->getLineColor();
+        }
+      }
     }
     mpTextAnnotation = 0;
   } else if (mLineType == LineAnnotation::TransitionType) {
@@ -186,6 +212,8 @@ LineAnnotation::LineAnnotation(QString annotation, Component *pStartComponent, C
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   parseShapeAnnotation(annotation);
   /* make the points relative to origin */
   QList<QPointF> points;
@@ -223,6 +251,8 @@ LineAnnotation::LineAnnotation(QString annotation, QString text, Component *pSta
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   parseShapeAnnotation(annotation);
   /* make the points relative to origin */
   QList<QPointF> points;
@@ -261,6 +291,8 @@ LineAnnotation::LineAnnotation(QString annotation, Component *pComponent, Graphi
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   parseShapeAnnotation(annotation);
   /* make the points relative to origin */
   QList<QPointF> points;
@@ -291,6 +323,8 @@ LineAnnotation::LineAnnotation(Component *pParent)
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   // set the default values
   GraphicItem::setDefaults();
   ShapeAnnotation::setDefaults();
@@ -326,6 +360,8 @@ LineAnnotation::LineAnnotation(GraphicsView *pGraphicsView)
   setZf("");
   setZfr("");
   setAlpha("");
+  setOMSConnectionType(oms3_connection_single);
+  setActiveState(false);
   // set the default values
   GraphicItem::setDefaults();
   ShapeAnnotation::setDefaults();
@@ -439,6 +475,13 @@ void LineAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
   Q_UNUSED(option);
   Q_UNUSED(widget);
   if (mVisible || !mDynamicVisible.isEmpty()) {
+    if (mLineType == LineAnnotation::TransitionType && mpGraphicsView->isVisualizationView()) {
+      if (isActiveState()) {
+        painter->setOpacity(1.0);
+      } else {
+        painter->setOpacity(0.2);
+      }
+    }
     drawLineAnnotaion(painter);
   }
 }
@@ -991,12 +1034,19 @@ void LineAnnotation::updateShape(ShapeAnnotation *pShapeAnnotation)
   setReset(pLineAnnotation->getReset());
   setSynchronize(pLineAnnotation->getSynchronize());
   setPriority(pLineAnnotation->getPriority());
-  mpTextAnnotation = pLineAnnotation->getTextAnnotation();
+  if (pLineAnnotation->getTextAnnotation()) {
+    mpTextAnnotation = new TextAnnotation("", this);
+    mpTextAnnotation->updateShape(pLineAnnotation->getTextAnnotation());
+  } else {
+    mpTextAnnotation = 0;
+  }
   setOldAnnotation(pLineAnnotation->getOldAnnotation());
   setDelay(pLineAnnotation->getDelay());
   setZf(pLineAnnotation->getZf());
   setZfr(pLineAnnotation->getZfr());
   setAlpha(pLineAnnotation->getAlpha());
+  setOMSConnectionType(pLineAnnotation->getOMSConnectionType());
+  setActiveState(pLineAnnotation->isActiveState());
   // set the default values
   GraphicItem::setDefaults(pShapeAnnotation);
   mPoints.clear();
@@ -1004,6 +1054,7 @@ void LineAnnotation::updateShape(ShapeAnnotation *pShapeAnnotation)
   for (int i = 0 ; i < points.size() ; i++) {
     addPoint(points[i]);
   }
+  updateTransitionTextPosition();
   ShapeAnnotation::setDefaults(pShapeAnnotation);
 }
 
@@ -1020,6 +1071,64 @@ void LineAnnotation::setAligned(bool aligned)
     setLineColor(QColor(Qt::red));
   }
   update();
+}
+
+/*!
+ * \brief LineAnnotation::updateOMSConnection
+ * Updates the OMSimulator model connection
+ */
+void LineAnnotation::updateOMSConnection()
+{
+  // connection geometry
+  ssd_connection_geometry_t connectionGeometry;
+  QList<QPointF> points = mPoints;
+  if (points.size() >= 2) {
+    points.removeFirst();
+    points.removeLast();
+  }
+  connectionGeometry.n = points.size();
+  if (points.size() == 0) {
+    connectionGeometry.pointsX = NULL;
+    connectionGeometry.pointsY = NULL;
+  } else {
+    connectionGeometry.pointsX = new double[points.size()];
+    connectionGeometry.pointsY = new double[points.size()];
+  }
+  for (int i = 0 ; i < points.size() ; i++) {
+    connectionGeometry.pointsX[i] = points.at(i).x();
+    connectionGeometry.pointsY[i] = points.at(i).y();
+  }
+
+  OMSProxy::instance()->setConnectionGeometry(getStartComponentName(), getEndComponentName(), &connectionGeometry);
+}
+
+void LineAnnotation::showOMSConnection()
+{
+  if ((mpStartComponent && mpStartComponent->getLibraryTreeItem()->getOMSBusConnector())
+      && (mpEndComponent && mpEndComponent->getLibraryTreeItem()->getOMSBusConnector())) {
+    BusConnectionDialog *pBusConnectionDialog = new BusConnectionDialog(mpGraphicsView, this, false);
+    pBusConnectionDialog->exec();
+  } else if ((mpStartComponent && mpStartComponent->getLibraryTreeItem()->getOMSTLMBusConnector())
+             && (mpEndComponent && mpEndComponent->getLibraryTreeItem()->getOMSTLMBusConnector())) {
+    TLMConnectionDialog *pTLMBusConnectionDialog = new TLMConnectionDialog(mpGraphicsView, this, false);
+    pTLMBusConnectionDialog->exec();
+  }
+}
+
+void LineAnnotation::updateToolTip()
+{
+  if (mLineType == LineAnnotation::ConnectionType) {
+    setToolTip(QString("<b>connect</b>(%1, %2)").arg(getStartComponentName()).arg(getEndComponentName()));
+  } else if (mLineType == LineAnnotation::TransitionType) {
+    setToolTip(QString("<b>transition</b>(%1, %2, %3, %4, %5, %6, %7)")
+               .arg(getStartComponentName())
+               .arg(getEndComponentName())
+               .arg(getCondition())
+               .arg(getImmediate() ? "true" : "false")
+               .arg(getReset() ? "true" : "false")
+               .arg(getSynchronize() ? "true" : "false")
+               .arg(getPriority()));
+  }
 }
 
 QVariant LineAnnotation::itemChange(GraphicsItemChange change, const QVariant &value)
@@ -1114,6 +1223,8 @@ void LineAnnotation::updateConnectionAnnotation()
   if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::CompositeModel) {
     CompositeModelEditor *pCompositeModelEditor = dynamic_cast<CompositeModelEditor*>(mpGraphicsView->getModelWidget()->getEditor());
     pCompositeModelEditor->updateConnection(this);
+  } else if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->getLibraryType()== LibraryTreeItem::OMS) {
+    updateOMSConnection();
   } else {
     // get the connection line annotation.
     QString annotationString = QString("annotate=").append(getShapeAnnotation());
@@ -1124,16 +1235,23 @@ void LineAnnotation::updateConnectionAnnotation()
   }
 }
 
-void LineAnnotation::updateConnectionTransformation(QUndoCommand *pUndoCommand)
+/*!
+ * \brief LineAnnotation::updateConnectionTransformation
+ * Slot activated when Component transformChanging SIGNAL is emitted.\n
+ * Updates the connection.
+ */
+void LineAnnotation::updateConnectionTransformation()
 {
   assert(!mOldAnnotation.isEmpty());
   if (mLineType == LineAnnotation::ConnectionType) {
-    new UpdateConnectionCommand(this, mOldAnnotation, getOMCShapeAnnotation(), pUndoCommand);
+    mpGraphicsView->getModelWidget()->getUndoStack()->push(new UpdateConnectionCommand(this, mOldAnnotation, getOMCShapeAnnotation()));
   } else if (mLineType == LineAnnotation::TransitionType) {
-    new UpdateTransitionCommand(this, mCondition, mImmediate, mReset, mSynchronize, mPriority, mOldAnnotation,
-                                mCondition, mImmediate, mReset, mSynchronize, mPriority, getOMCShapeAnnotation(), pUndoCommand);
+    mpGraphicsView->getModelWidget()->getUndoStack()->push(new UpdateTransitionCommand(this, mCondition, mImmediate, mReset,
+                                                                                       mSynchronize, mPriority, mOldAnnotation,
+                                                                                       mCondition, mImmediate, mReset, mSynchronize,
+                                                                                       mPriority, getOMCShapeAnnotation()));
   } else if (mLineType == LineAnnotation::InitialStateType) {
-    new UpdateInitialStateCommand(this, mOldAnnotation, getOMCShapeAnnotation(), pUndoCommand);
+    mpGraphicsView->getModelWidget()->getUndoStack()->push(new UpdateInitialStateCommand(this, mOldAnnotation, getOMCShapeAnnotation()));
   }
 }
 
@@ -1996,6 +2114,9 @@ CreateOrEditTransitionDialog::CreateOrEditTransitionDialog(GraphicsView *pGraphi
   // Create the buttons
   mpOkButton = new QPushButton(Helper::ok);
   mpOkButton->setAutoDefault(true);
+  if (mpGraphicsView->getModelWidget()->getLibraryTreeItem()->isSystemLibrary() || mpGraphicsView->isVisualizationView()) {
+    mpOkButton->setDisabled(true);
+  }
   connect(mpOkButton, SIGNAL(clicked()), SLOT(createOrEditTransition()));
   mpCancelButton = new QPushButton(Helper::cancel);
   mpCancelButton->setAutoDefault(false);

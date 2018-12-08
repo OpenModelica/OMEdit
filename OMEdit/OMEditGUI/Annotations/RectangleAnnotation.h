@@ -1,7 +1,7 @@
 /*
  * This file is part of OpenModelica.
  *
- * Copyright (c) 1998-2014, Open Source Modelica Consortium (OSMC),
+ * Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
  * c/o Linköpings universitet, Department of Computer and Information Science,
  * SE-58183 Linköping, Sweden.
  *
@@ -50,6 +50,8 @@ public:
   RectangleAnnotation(ShapeAnnotation *pShapeAnnotation, GraphicsView *pGraphicsView);
   // Used for default component
   RectangleAnnotation(Component *pParent);
+  // Used for OMSimulator FMU
+  RectangleAnnotation(GraphicsView *pGraphicsView);
   void parseShapeAnnotation(QString annotation);
   QRectF boundingRect() const;
   QPainterPath shape() const;

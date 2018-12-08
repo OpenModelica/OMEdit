@@ -87,10 +87,12 @@ win32 {
   }
   LIBS += -L../OMEditGUI/Debugger/Parser -lGDBMIParser \
     -L$$(OMBUILDDIR)/lib/omc -lomantlr3 -lOMPlot -lomqwt -lomopcua \
-    -lOpenModelicaCompiler -lOpenModelicaRuntimeC -lfmilib -lModelicaExternalC -lomcgc -lpthread -lshlwapi\
-    -lws2_32
+    -lOpenModelicaCompiler -lOpenModelicaRuntimeC -lfmilib -lModelicaExternalC -lomcgc -lpthread -lshlwapi \
+    -lws2_32 \
+    -L$$(OMBUILDDIR)/lib -lOMSimulator -lomtlmsimulator
 
   INCLUDEPATH += $$(OMBUILDDIR)/include/omplot \
+    $$(OMBUILDDIR)/include \
     $$(OMBUILDDIR)/include/omplot/qwt \
     $$(OMBUILDDIR)/include/omc/antlr3 $$(OMBUILDDIR)/include/omc/c
 
@@ -111,6 +113,9 @@ win32 {
     QMAKE_CXXFLAGS += -g
     QMAKE_LFLAGS_RELEASE = -rdynamic
   }
+  equals(QT_ARCH, i386)|equals(QT_ARCH, i486)|equals(QT_ARCH, i586)|equals(QT_ARCH, i686) { # 32-bit
+    LIBS += -latomic -lboost_atomic
+  }
 }
 
 SOURCES += main.cpp \
@@ -121,11 +126,13 @@ SOURCES += main.cpp \
   $$OPENMODELICAHOME/include/omc/scripting-API/OpenModelicaScriptingAPIQt.cpp \
   OMC/OMCProxy.cpp \
   Modeling/MessagesWidget.cpp \
+  Modeling/ItemDelegate.cpp \
   Modeling/LibraryTreeWidget.cpp \
   Modeling/Commands.cpp \
   Modeling/CoOrdinateSystem.cpp \
   Modeling/ModelWidgetContainer.cpp \
   Modeling/ModelicaClassDialog.cpp \
+  Modeling/FunctionArgumentDialog.cpp \
   Search/SearchWidget.cpp \
   Options/OptionsDialog.cpp \
   Editors/BaseEditor.cpp \
@@ -134,6 +141,7 @@ SOURCES += main.cpp \
   Editors/TextEditor.cpp \
   Editors/CEditor.cpp \
   Editors/CompositeModelEditor.cpp \
+  Editors/OMSimulatorEditor.cpp \
   Editors/MetaModelicaEditor.cpp \
   Editors/HTMLEditor.cpp \
   Plotting/PlotWindowContainer.cpp \
@@ -153,6 +161,7 @@ SOURCES += main.cpp \
   Simulation/SimulationOutputWidget.cpp \
   Simulation/SimulationProcessThread.cpp \
   Simulation/SimulationOutputHandler.cpp \
+  Simulation/OpcUaClient.cpp \
   TLM/FetchInterfaceDataDialog.cpp \
   TLM/FetchInterfaceDataThread.cpp \
   TLM/TLMCoSimulationDialog.cpp \
@@ -161,6 +170,7 @@ SOURCES += main.cpp \
   FMI/ImportFMUDialog.cpp \
   FMI/ImportFMUModelDescriptionDialog.cpp \
   Plotting/VariablesWidget.cpp \
+  Plotting/DiagramWindow.cpp \
   Options/NotificationsDialog.cpp \
   Annotations/ShapePropertiesDialog.cpp \
   TransformationalDebugger/OMDumpXML.cpp \
@@ -187,7 +197,15 @@ SOURCES += main.cpp \
   OMEditApplication.cpp \
   Traceability/TraceabilityGraphViewWidget.cpp \
   Traceability/TraceabilityInformationURI.cpp \
-  Simulation/OpcUaClient.cpp
+  OMS/OMSProxy.cpp \
+  OMS/ModelDialog.cpp \
+  OMS/BusDialog.cpp \
+  OMS/ElementPropertiesDialog.cpp \
+  OMS/SystemSimulationInformationDialog.cpp \
+  OMS/InstantiateDialog.cpp \
+  OMS/OMSSimulationDialog.cpp \
+  OMS/OMSSimulationOutputWidget.cpp \
+  Animation/TimeManager.cpp
 
 HEADERS  += Util/Helper.h \
   Util/Utilities.h \
@@ -195,12 +213,15 @@ HEADERS  += Util/Helper.h \
   MainWindow.h \
   $$OPENMODELICAHOME/include/omc/scripting-API/OpenModelicaScriptingAPIQt.h \
   OMC/OMCProxy.h \
+  Simulation/SimulationOptions.h \
   Modeling/MessagesWidget.h \
+  Modeling/ItemDelegate.h \
   Modeling/LibraryTreeWidget.h \
   Modeling/Commands.h \
   Modeling/CoOrdinateSystem.h \
   Modeling/ModelWidgetContainer.h \
   Modeling/ModelicaClassDialog.h \
+  Modeling/FunctionArgumentDialog.h \
   Search/SearchWidget.h \
   Options/OptionsDialog.h \
   Editors/BaseEditor.h \
@@ -209,6 +230,7 @@ HEADERS  += Util/Helper.h \
   Editors/TextEditor.h \
   Editors/CEditor.h \
   Editors/CompositeModelEditor.h \
+  Editors/OMSimulatorEditor.h \
   Editors/MetaModelicaEditor.h \
   Editors/HTMLEditor.h \
   Plotting/PlotWindowContainer.h \
@@ -224,11 +246,11 @@ HEADERS  += Util/Helper.h \
   Component/ComponentProperties.h \
   Component/Transformation.h \
   Modeling/DocumentationWidget.h \
-  Simulation/SimulationOptions.h \
   Simulation/SimulationDialog.h \
   Simulation/SimulationOutputWidget.h \
   Simulation/SimulationProcessThread.h \
   Simulation/SimulationOutputHandler.h \
+  Simulation/OpcUaClient.h \
   TLM/FetchInterfaceDataDialog.h \
   TLM/FetchInterfaceDataThread.h \
   TLM/TLMCoSimulationOptions.h \
@@ -238,6 +260,7 @@ HEADERS  += Util/Helper.h \
   FMI/ImportFMUDialog.h \
   FMI/ImportFMUModelDescriptionDialog.h \
   Plotting/VariablesWidget.h \
+  Plotting/DiagramWindow.h \
   Options/NotificationsDialog.h \
   Annotations/ShapePropertiesDialog.h \
   TransformationalDebugger/OMDumpXML.cpp \
@@ -264,7 +287,16 @@ HEADERS  += Util/Helper.h \
   OMEditApplication.h \
   Traceability/TraceabilityGraphViewWidget.h \
   Traceability/TraceabilityInformationURI.h \
-  Simulation/OpcUaClient.h
+  OMS/OMSProxy.h \
+  OMS/ModelDialog.h \
+  OMS/BusDialog.h \
+  OMS/ElementPropertiesDialog.h \
+  OMS/SystemSimulationInformationDialog.h \
+  OMS/InstantiateDialog.h \
+  OMS/OMSSimulationOptions.h \
+  OMS/OMSSimulationDialog.h \
+  OMS/OMSSimulationOutputWidget.h \
+  Animation/TimeManager.h
 
 CONFIG(osg) {
 
@@ -287,8 +319,7 @@ SOURCES += Animation/AbstractAnimationWindow.cpp \
   Animation/VisualizerFMU.cpp \
   Animation/FMUSettingsDialog.cpp \
   Animation/FMUWrapper.cpp \
-  Animation/Shapes.cpp \
-  Animation/TimeManager.cpp
+  Animation/Shapes.cpp
 
 greaterThan(QT_MAJOR_VERSION, 4):greaterThan(QT_MINOR_VERSION, 3) { # if Qt 5.4 or greater
   HEADERS += Animation/OpenGLWidget.h
@@ -308,7 +339,6 @@ HEADERS += Animation/AbstractAnimationWindow.h \
   Animation/FMUSettingsDialog.h \
   Animation/FMUWrapper.h \
   Animation/Shapes.h \
-  Animation/TimeManager.h \
   Animation/rapidxml.hpp
 }
 
