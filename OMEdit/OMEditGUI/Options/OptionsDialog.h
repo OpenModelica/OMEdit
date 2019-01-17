@@ -932,6 +932,7 @@ public:
   void setWorkingDirectory(QString value) {mpWorkingDirectoryTextBox->setText(value);}
   QString getWorkingDirectory() {return mpWorkingDirectoryTextBox->text();}
   QComboBox* getLoggingLevelComboBox() {return mpLoggingLevelComboBox;}
+  QLineEdit* getCommandLineOptionsTextBox() {return mpCommandLineOptionsTextBox;}
 private:
   OptionsDialog *mpOptionsDialog;
   QGroupBox *mpGeneralGroupBox;
@@ -940,6 +941,8 @@ private:
   QPushButton *mpBrowseWorkingDirectoryButton;
   Label *mpLoggingLevelLabel;
   QComboBox *mpLoggingLevelComboBox;
+  Label *mpCommandLineOptionsLabel;
+  QLineEdit *mpCommandLineOptionsTextBox;
 private slots:
   void browseWorkingDirectory();
 };
