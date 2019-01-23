@@ -3056,6 +3056,7 @@ void LibraryTreeView::createActions()
   // OMSimulator rename Action
   mpOMSRenameAction = new QAction(Helper::rename, this);
   mpOMSRenameAction->setStatusTip(Helper::OMSRenameTip);
+  mpOMSRenameAction->setEnabled(false);
   connect(mpOMSRenameAction, SIGNAL(triggered()), SLOT(OMSRename()));
   // OMSimulator simulation setup action
   mpOMSSimulationSetupAction = new QAction(QIcon(":/Resources/icons/tlm-simulate.svg"), Helper::simulate, this);
