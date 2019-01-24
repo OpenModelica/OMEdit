@@ -129,7 +129,8 @@ SystemSimulationInformationWidget::SystemSimulationInformationWidget(ModelWidget
 
   if (mpModelWidget->getLibraryTreeItem()->isWCSystem()) { // oms_system_wc
     mpSolverComboBox->addItem("oms-ma", oms_solver_wc_ma);
-    mpSolverComboBox->addItem("oms-mav", oms_solver_wc_mav);
+    // Todo: enable 'oms_solver_wc_mav' as soon as it is available
+    // mpSolverComboBox->addItem("oms-mav", oms_solver_wc_mav);
   } else if (mpModelWidget->getLibraryTreeItem()->isSCSystem()) { // oms_system_sc
     mpSolverComboBox->addItem("cvode", oms_solver_sc_cvode);
     mpSolverComboBox->addItem("explicit-euler", oms_solver_sc_explicit_euler);
